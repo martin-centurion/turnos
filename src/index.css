@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap");
 
 *,
 *::before,
@@ -8,13 +8,16 @@
 
 :root {
   --font-body: "Plus Jakarta Sans", "Segoe UI", sans-serif;
-  --font-accent: "Fraunces", "Times New Roman", serif;
-  --text-main: #5f4b40;
+  --text-main: #1a1a1a;
+  --text-muted: #5e6b6b;
+  --bg: #f2f6f6;
+  --accent: #4fb0ae;
+  --accent-strong: #3f9e9c;
   font-family: var(--font-body);
   font-weight: 400;
   line-height: 1.5;
   color: var(--text-main);
-  background-color: #efe2d6;
+  background-color: var(--bg);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
