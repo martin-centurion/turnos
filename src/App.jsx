@@ -153,6 +153,18 @@ const normalizePhone = (value) => value.replace(/[^\d]/g, "");
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "admin123";
 
+const loadReservations = () => {
+  if (typeof window === "undefined") return [];
+  const stored = window.localStorage.getItem("turnos_reservations");
+  if (!stored) return [];
+  try {
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+};
+
 function App() {
   const [route, setRoute] = useState(() =>
     getRouteFromPath(window.location.pathname)
@@ -165,7 +177,7 @@ function App() {
   const [adminSelectedDate, setAdminSelectedDate] = useState(() =>
     toIsoDate(new Date())
   );
-  const [reservations, setReservations] = useState([]);
+  const [reservations, setReservations] = useState(() => loadReservations());
   const [rescheduleId, setRescheduleId] = useState(null);
   const [rescheduleTime, setRescheduleTime] = useState("");
   const [screen, setScreen] = useState("home");
@@ -224,6 +236,29 @@ function App() {
       );
     }
   }, [adminMonth]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      "turnos_reservations",
+      JSON.stringify(reservations)
+    );
+  }, [reservations]);
+
+  useEffect(() => {
+    if (route !== "admin" || reservations.length === 0) return;
+    const hasSelected = reservations.some(
+      (reservation) => reservation.date === adminSelectedDate
+    );
+    if (hasSelected) return;
+    const sorted = [...reservations].sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+    const nextDate = sorted[0].date;
+    if (!nextDate) return;
+    setAdminSelectedDate(nextDate);
+    setAdminMonth(new Date(`${nextDate}T00:00:00`));
+  }, [route, reservations]);
 
   const startBooking = () => {
     setSelectedService(null);
@@ -523,7 +558,12 @@ function App() {
             </div>
 
             {dailyReservations.length === 0 ? (
-              <p className="empty-state">No hay reservas para este día.</p>
+              <div className="empty-state">
+                <p>No hay reservas para este día.</p>
+                {reservations.length > 0 && (
+                  <p>Seleccioná un día con badge en el calendario.</p>
+                )}
+              </div>
             ) : (
               <div className="reservation-list">
                 {dailyReservations.map((reservation) => (

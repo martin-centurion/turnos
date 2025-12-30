@@ -672,6 +672,12 @@
   margin: 0;
   font-size: 13px;
   color: var(--text-muted);
+  display: grid;
+  gap: 6px;
+}
+
+.empty-state p {
+  margin: 0;
 }
 
 .login-panel {
