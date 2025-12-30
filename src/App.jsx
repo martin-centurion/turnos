@@ -312,7 +312,8 @@ function App() {
                   </svg>
                 </button>
                 <p className="calendar-month">
-                  {months[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
+                  {months[calendarMonth.getMonth()]}{" "}
+                  {calendarMonth.getFullYear()}
                 </p>
                 <button
                   className="icon-button calendar-nav"
@@ -352,10 +353,7 @@ function App() {
                 {buildCalendarDays(calendarMonth).map((cell) => {
                   if (cell.empty) {
                     return (
-                      <span
-                        key={cell.key}
-                        className="calendar-cell empty"
-                      />
+                      <span key={cell.key} className="calendar-cell empty" />
                     );
                   }
                   return (
@@ -593,12 +591,7 @@ function App() {
           </p>
         </div>
 
-        <a
-          className="primary-button"
-          href="https://www.mercadopago.com.ar/"
-          target="_blank"
-          rel="noreferrer"
-        >
+        <a className="primary-button" href="#" target="_blank" rel="noreferrer">
           Pagar con Mercado Pago
         </a>
       </section>
