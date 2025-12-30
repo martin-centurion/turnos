@@ -153,18 +153,6 @@ const normalizePhone = (value) => value.replace(/[^\d]/g, "");
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "admin123";
 
-const loadReservations = () => {
-  if (typeof window === "undefined") return [];
-  const stored = window.localStorage.getItem("turnos_reservations");
-  if (!stored) return [];
-  try {
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    return [];
-  }
-};
-
 function App() {
   const [route, setRoute] = useState(() =>
     getRouteFromPath(window.location.pathname)
@@ -177,7 +165,11 @@ function App() {
   const [adminSelectedDate, setAdminSelectedDate] = useState(() =>
     toIsoDate(new Date())
   );
-  const [reservations, setReservations] = useState(() => loadReservations());
+  const [reservations, setReservations] = useState([]);
+  const [loadingReservations, setLoadingReservations] = useState(false);
+  const [reservationError, setReservationError] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [rescheduleId, setRescheduleId] = useState(null);
   const [rescheduleTime, setRescheduleTime] = useState("");
   const [screen, setScreen] = useState("home");
@@ -221,6 +213,23 @@ function App() {
       .map((slot) => slot.time);
   };
 
+  const fetchReservations = async () => {
+    setLoadingReservations(true);
+    setReservationError("");
+    try {
+      const response = await fetch("/api/reservations");
+      if (!response.ok) {
+        throw new Error("request_failed");
+      }
+      const data = await response.json();
+      setReservations(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setReservationError("No se pudieron cargar las reservas.");
+    } finally {
+      setLoadingReservations(false);
+    }
+  };
+
   const navigate = (nextRoute, path) => {
     setRoute(nextRoute);
     window.history.pushState({}, "", path);
@@ -235,6 +244,10 @@ function App() {
   }, []);
 
   useEffect(() => {
+    fetchReservations();
+  }, []);
+
+  useEffect(() => {
     if (route === "admin" && !adminAuthed) {
       navigate("admin-login", "/login");
     }
@@ -242,6 +255,18 @@ function App() {
       navigate("admin", "/admin");
     }
   }, [route, adminAuthed]);
+
+  useEffect(() => {
+    if (route === "admin") {
+      fetchReservations();
+    }
+  }, [route]);
+
+  useEffect(() => {
+    if (screen === "time") {
+      fetchReservations();
+    }
+  }, [screen]);
 
   useEffect(() => {
     const selected = new Date(`${adminSelectedDate}T00:00:00`);
@@ -254,14 +279,6 @@ function App() {
       );
     }
   }, [adminMonth]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(
-      "turnos_reservations",
-      JSON.stringify(reservations)
-    );
-  }, [reservations]);
 
   useEffect(() => {
     if (route !== "admin" || reservations.length === 0) return;
@@ -286,6 +303,7 @@ function App() {
     setContactName("");
     setContactWhatsapp("");
     setAliasCopied(false);
+    setSubmitError("");
     setScreen("services");
   };
 
@@ -299,11 +317,10 @@ function App() {
     }
   };
 
-  const handleStartReservation = () => {
-    const newReservation = {
-      id: typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `${Date.now()}`,
+  const handleStartReservation = async () => {
+    setSubmitError("");
+    setIsSubmitting(true);
+    const payload = {
       name: contactName.trim(),
       whatsapp: contactWhatsapp.trim(),
       service: service?.name || "Servicio",
@@ -311,8 +328,24 @@ function App() {
       time: selectedTime,
       status: "pending",
     };
-    setReservations((prev) => [...prev, newReservation]);
-    setScreen("thanks");
+
+    try {
+      const response = await fetch("/api/reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error("request_failed");
+      }
+      const saved = await response.json();
+      setReservations((prev) => [...prev, saved]);
+      setScreen("thanks");
+    } catch (error) {
+      setSubmitError("No se pudo guardar la reserva. Intentá de nuevo.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleAdminLogin = (event) => {
@@ -321,6 +354,7 @@ function App() {
       setAdminAuthed(true);
       setAdminError("");
       navigate("admin", "/admin");
+      fetchReservations();
       return;
     }
     setAdminError("Credenciales incorrectas.");
@@ -334,12 +368,26 @@ function App() {
     navigate("admin-login", "/login");
   };
 
-  const updateReservationStatus = (id, status) => {
-    setReservations((prev) =>
-      prev.map((reservation) =>
-        reservation.id === id ? { ...reservation, status } : reservation
-      )
-    );
+  const updateReservationStatus = async (id, status) => {
+    setReservationError("");
+    try {
+      const response = await fetch("/api/reservations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status }),
+      });
+      if (!response.ok) {
+        throw new Error("request_failed");
+      }
+      const updated = await response.json();
+      setReservations((prev) =>
+        prev.map((reservation) =>
+          reservation.id === id ? updated : reservation
+        )
+      );
+    } catch (error) {
+      setReservationError("No se pudo actualizar la reserva.");
+    }
   };
 
   const startReschedule = (reservation) => {
@@ -347,21 +395,33 @@ function App() {
     setRescheduleTime(reservation.time);
   };
 
-  const applyReschedule = () => {
+  const applyReschedule = async () => {
     if (!rescheduleId || !rescheduleTime) return;
-    setReservations((prev) =>
-      prev.map((reservation) =>
-        reservation.id === rescheduleId
-          ? {
-              ...reservation,
-              time: rescheduleTime,
-              date: adminSelectedDate,
-            }
-          : reservation
-      )
-    );
-    setRescheduleId(null);
-    setRescheduleTime("");
+    setReservationError("");
+    try {
+      const response = await fetch("/api/reservations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: rescheduleId,
+          date: adminSelectedDate,
+          time: rescheduleTime,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("request_failed");
+      }
+      const updated = await response.json();
+      setReservations((prev) =>
+        prev.map((reservation) =>
+          reservation.id === rescheduleId ? updated : reservation
+        )
+      );
+      setRescheduleId(null);
+      setRescheduleTime("");
+    } catch (error) {
+      setReservationError("No se pudo reprogramar la reserva.");
+    }
   };
 
   if (route === "admin-login") {
@@ -473,6 +533,13 @@ function App() {
               Cerrar sesión
             </button>
           </header>
+
+          {reservationError && (
+            <p className="admin-error">{reservationError}</p>
+          )}
+          {loadingReservations && (
+            <p className="admin-loading">Actualizando reservas...</p>
+          )}
 
           <section className="admin-calendar">
             <div className="calendar-header">
@@ -1207,12 +1274,14 @@ function App() {
           </div>
         </div>
 
+        {submitError && <p className="submit-error">{submitError}</p>}
         <button
           className="primary-button"
           type="button"
           onClick={handleStartReservation}
+          disabled={isSubmitting}
         >
-          Iniciar reserva
+          {isSubmitting ? "Guardando..." : "Iniciar reserva"}
         </button>
       </section>
     </main>

@@ -709,3 +709,21 @@
   cursor: pointer;
   text-decoration: underline;
 }
+
+.admin-error {
+  margin: 0;
+  font-size: 12px;
+  color: #d0392f;
+}
+
+.admin-loading {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.submit-error {
+  margin: 0;
+  font-size: 12px;
+  color: #d0392f;
+}
