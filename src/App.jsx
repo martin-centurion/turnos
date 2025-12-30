@@ -199,9 +199,27 @@ function App() {
     }\nFecha: ${formatDate(selectedDate)}\nHorario: ${selectedTime}\nNombre: ${contactName}\nWhatsApp: ${contactWhatsapp}`
   );
   const whatsappLink = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`;
-  const availableSlots = timeSlots
-    .filter((slot) => slot.available)
-    .map((slot) => slot.time);
+
+  const getBookedTimes = (date, serviceName, excludeId) => {
+    if (!date || !serviceName) return [];
+    return reservations
+      .filter(
+        (reservation) =>
+          (reservation.status === "approved" ||
+            reservation.status === "pending") &&
+          reservation.date === date &&
+          reservation.service === serviceName &&
+          reservation.id !== excludeId
+      )
+      .map((reservation) => reservation.time);
+  };
+
+  const getAvailableTimes = (date, serviceName, excludeId) => {
+    const bookedTimes = getBookedTimes(date, serviceName, excludeId);
+    return timeSlots
+      .filter((slot) => slot.available && !bookedTimes.includes(slot.time))
+      .map((slot) => slot.time);
+  };
 
   const navigate = (nextRoute, path) => {
     setRoute(nextRoute);
@@ -633,7 +651,11 @@ function App() {
                             }
                           >
                             <option value="">Seleccionar horario</option>
-                            {availableSlots.map((slot) => (
+                            {getAvailableTimes(
+                              adminSelectedDate,
+                              reservation.service,
+                              reservation.id
+                            ).map((slot) => (
                               <option key={slot} value={slot}>
                                 {slot}
                               </option>
@@ -918,6 +940,8 @@ function App() {
   }
 
   if (screen === "time") {
+    const bookedTimes = getBookedTimes(selectedDate, service?.name);
+
     return (
       <main className="booking-screen">
         <section className="booking-panel" aria-label="Seleccionar horario">
@@ -955,7 +979,7 @@ function App() {
                 className={`time-slot${
                   selectedTime === slot.time ? " selected" : ""
                 }`}
-                disabled={!slot.available}
+                disabled={!slot.available || bookedTimes.includes(slot.time)}
                 onClick={() => setSelectedTime(slot.time)}
               >
                 {slot.time}
