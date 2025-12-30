@@ -579,7 +579,7 @@ function App() {
             <p className="summary-label">Medios de pago</p>
             <a
               className="mp-button"
-              href="https://www.mercadopago.com.ar/"
+              href="https://mpago.li/24YRSY9"
               target="_blank"
               rel="noreferrer"
             >
