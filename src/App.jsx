@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
 
 const contactLinks = [
@@ -111,7 +111,63 @@ const buildCalendarDays = (monthDate) => {
   return cells;
 };
 
+const buildAdminCalendarDays = (monthDate, countsByDate) => {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const startOffset = (firstOfMonth.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+
+  for (let i = 0; i < startOffset; i += 1) {
+    cells.push({ key: `empty-${i}`, empty: true });
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = new Date(year, month, day);
+    const iso = toIsoDate(date);
+    cells.push({
+      key: iso,
+      iso,
+      label: day,
+      count: countsByDate[iso] || 0,
+    });
+  }
+
+  const totalCells = Math.ceil(cells.length / 7) * 7;
+  while (cells.length < totalCells) {
+    cells.push({ key: `empty-${cells.length}`, empty: true });
+  }
+
+  return cells;
+};
+
+const getRouteFromPath = (path) => {
+  if (path.startsWith("/login")) return "admin-login";
+  if (path.startsWith("/admin")) return "admin";
+  return "client";
+};
+
+const normalizePhone = (value) => value.replace(/[^\d]/g, "");
+
+const ADMIN_USER = "admin";
+const ADMIN_PASS = "admin123";
+
 function App() {
+  const [route, setRoute] = useState(() =>
+    getRouteFromPath(window.location.pathname)
+  );
+  const [adminAuthed, setAdminAuthed] = useState(false);
+  const [adminUser, setAdminUser] = useState("");
+  const [adminPass, setAdminPass] = useState("");
+  const [adminError, setAdminError] = useState("");
+  const [adminMonth, setAdminMonth] = useState(() => new Date());
+  const [adminSelectedDate, setAdminSelectedDate] = useState(() =>
+    toIsoDate(new Date())
+  );
+  const [reservations, setReservations] = useState([]);
+  const [rescheduleId, setRescheduleId] = useState(null);
+  const [rescheduleTime, setRescheduleTime] = useState("");
   const [screen, setScreen] = useState("home");
   const [selectedService, setSelectedService] = useState(null);
   const [selectedDate, setSelectedDate] = useState("");
@@ -131,6 +187,43 @@ function App() {
     }\nFecha: ${formatDate(selectedDate)}\nHorario: ${selectedTime}\nNombre: ${contactName}\nWhatsApp: ${contactWhatsapp}`
   );
   const whatsappLink = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`;
+  const availableSlots = timeSlots
+    .filter((slot) => slot.available)
+    .map((slot) => slot.time);
+
+  const navigate = (nextRoute, path) => {
+    setRoute(nextRoute);
+    window.history.pushState({}, "", path);
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setRoute(getRouteFromPath(window.location.pathname));
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (route === "admin" && !adminAuthed) {
+      navigate("admin-login", "/login");
+    }
+    if (route === "admin-login" && adminAuthed) {
+      navigate("admin", "/admin");
+    }
+  }, [route, adminAuthed]);
+
+  useEffect(() => {
+    const selected = new Date(`${adminSelectedDate}T00:00:00`);
+    if (
+      selected.getMonth() !== adminMonth.getMonth() ||
+      selected.getFullYear() !== adminMonth.getFullYear()
+    ) {
+      setAdminSelectedDate(
+        toIsoDate(new Date(adminMonth.getFullYear(), adminMonth.getMonth(), 1))
+      );
+    }
+  }, [adminMonth]);
 
   const startBooking = () => {
     setSelectedService(null);
@@ -152,6 +245,390 @@ function App() {
       setAliasCopied(false);
     }
   };
+
+  const handleStartReservation = () => {
+    const newReservation = {
+      id: typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}`,
+      name: contactName.trim(),
+      whatsapp: contactWhatsapp.trim(),
+      service: service?.name || "Servicio",
+      date: selectedDate,
+      time: selectedTime,
+      status: "pending",
+    };
+    setReservations((prev) => [...prev, newReservation]);
+    setScreen("thanks");
+  };
+
+  const handleAdminLogin = (event) => {
+    event.preventDefault();
+    if (adminUser === ADMIN_USER && adminPass === ADMIN_PASS) {
+      setAdminAuthed(true);
+      setAdminError("");
+      navigate("admin", "/admin");
+      return;
+    }
+    setAdminError("Credenciales incorrectas.");
+  };
+
+  const handleAdminLogout = () => {
+    setAdminAuthed(false);
+    setAdminUser("");
+    setAdminPass("");
+    setAdminError("");
+    navigate("admin-login", "/login");
+  };
+
+  const updateReservationStatus = (id, status) => {
+    setReservations((prev) =>
+      prev.map((reservation) =>
+        reservation.id === id ? { ...reservation, status } : reservation
+      )
+    );
+  };
+
+  const startReschedule = (reservation) => {
+    setRescheduleId(reservation.id);
+    setRescheduleTime(reservation.time);
+  };
+
+  const applyReschedule = () => {
+    if (!rescheduleId || !rescheduleTime) return;
+    setReservations((prev) =>
+      prev.map((reservation) =>
+        reservation.id === rescheduleId
+          ? {
+              ...reservation,
+              time: rescheduleTime,
+              date: adminSelectedDate,
+            }
+          : reservation
+      )
+    );
+    setRescheduleId(null);
+    setRescheduleTime("");
+  };
+
+  if (route === "admin-login") {
+    return (
+      <main className="admin-screen">
+        <section className="admin-panel login-panel" aria-label="Acceso admin">
+          <header className="login-header">
+            <p className="flow-title">Acceso administrador</p>
+            <p className="flow-subtitle">
+              Ingresá con tu usuario y contraseña.
+            </p>
+          </header>
+
+          <form className="login-form" onSubmit={handleAdminLogin}>
+            <label className="form-field">
+              <span className="field-label">Usuario</span>
+              <input
+                className="text-input"
+                type="text"
+                value={adminUser}
+                onChange={(event) => setAdminUser(event.target.value)}
+                placeholder="admin"
+              />
+            </label>
+
+            <label className="form-field">
+              <span className="field-label">Contraseña</span>
+              <input
+                className="text-input"
+                type="password"
+                value={adminPass}
+                onChange={(event) => setAdminPass(event.target.value)}
+                placeholder="••••••••"
+              />
+            </label>
+
+            {adminError && <p className="login-error">{adminError}</p>}
+
+            <button className="primary-button" type="submit">
+              Ingresar
+            </button>
+          </form>
+
+          <button
+            className="ghost-link"
+            type="button"
+            onClick={() => {
+              setScreen("home");
+              navigate("client", "/");
+            }}
+          >
+            Volver al inicio
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  if (route === "admin") {
+    const reservationsByDate = reservations.reduce((acc, reservation) => {
+      acc[reservation.date] = (acc[reservation.date] || 0) + 1;
+      return acc;
+    }, {});
+    const adminCalendarDays = buildAdminCalendarDays(
+      adminMonth,
+      reservationsByDate
+    );
+    const dailyReservations = reservations.filter(
+      (reservation) => reservation.date === adminSelectedDate
+    );
+    const pendingCount = reservations.filter(
+      (reservation) => reservation.status === "pending"
+    ).length;
+
+    const statusLabel = (status) => {
+      if (status === "approved") return "Aprobada";
+      if (status === "rejected") return "Rechazada";
+      return "Pendiente";
+    };
+
+    const adminWhatsappLink = (reservation) => {
+      const phone = normalizePhone(reservation.whatsapp);
+      if (!phone) return "#";
+      const message = encodeURIComponent(
+        `Hola ${reservation.name}, te escribimos por tu reserva del ${formatDate(
+          reservation.date
+        )} a las ${reservation.time}.`
+      );
+      return `https://wa.me/${phone}?text=${message}`;
+    };
+
+    const monthLabel = `${months[adminMonth.getMonth()]} ${adminMonth.getFullYear()}`;
+
+    return (
+      <main className="admin-screen">
+        <section className="admin-panel" aria-label="Panel de reservas">
+          <header className="admin-topbar">
+            <div>
+              <p className="flow-title">Reservas</p>
+              <p className="flow-subtitle">
+                Pendientes: <strong>{pendingCount}</strong>
+              </p>
+            </div>
+            <button
+              className="secondary-button outline"
+              type="button"
+              onClick={handleAdminLogout}
+            >
+              Cerrar sesión
+            </button>
+          </header>
+
+          <section className="admin-calendar">
+            <div className="calendar-header">
+              <button
+                className="icon-button calendar-nav"
+                type="button"
+                aria-label="Mes anterior"
+                onClick={() =>
+                  setAdminMonth(
+                    (current) =>
+                      new Date(
+                        current.getFullYear(),
+                        current.getMonth() - 1,
+                        1
+                      )
+                  )
+                }
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M15 6l-6 6 6 6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <p className="calendar-month">{monthLabel}</p>
+              <button
+                className="icon-button calendar-nav"
+                type="button"
+                aria-label="Mes siguiente"
+                onClick={() =>
+                  setAdminMonth(
+                    (current) =>
+                      new Date(
+                        current.getFullYear(),
+                        current.getMonth() + 1,
+                        1
+                      )
+                  )
+                }
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M9 6l6 6-6 6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="calendar-weekdays">
+              {weekdays.map((day) => (
+                <span key={day} className="calendar-weekday">
+                  {day}
+                </span>
+              ))}
+            </div>
+
+            <div className="calendar-grid">
+              {adminCalendarDays.map((cell) => {
+                if (cell.empty) {
+                  return (
+                    <span key={cell.key} className="calendar-cell empty" />
+                  );
+                }
+                return (
+                  <button
+                    key={cell.key}
+                    type="button"
+                    className={`calendar-cell admin-cell${
+                      adminSelectedDate === cell.iso ? " selected" : ""
+                    }`}
+                    onClick={() => setAdminSelectedDate(cell.iso)}
+                  >
+                    <span>{cell.label}</span>
+                    {cell.count > 0 && (
+                      <span className="calendar-count">{cell.count}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="reservation-section">
+            <div className="reservation-header">
+              <p className="flow-title">
+                Reservas del {formatDate(adminSelectedDate)}
+              </p>
+              <span className="reservation-count">
+                {dailyReservations.length} reservas
+              </span>
+            </div>
+
+            {dailyReservations.length === 0 ? (
+              <p className="empty-state">No hay reservas para este día.</p>
+            ) : (
+              <div className="reservation-list">
+                {dailyReservations.map((reservation) => (
+                  <article className="reservation-card" key={reservation.id}>
+                    <div className="reservation-info">
+                      <div>
+                        <p className="reservation-name">{reservation.name}</p>
+                        <p className="reservation-meta">
+                          {reservation.service} · {reservation.time}
+                        </p>
+                        <p className="reservation-meta">
+                          WhatsApp: {reservation.whatsapp}
+                        </p>
+                      </div>
+                      <span className={`status-pill ${reservation.status}`}>
+                        {statusLabel(reservation.status)}
+                      </span>
+                    </div>
+
+                    <div className="reservation-actions">
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() =>
+                          updateReservationStatus(reservation.id, "approved")
+                        }
+                      >
+                        Aceptar
+                      </button>
+                      <button
+                        className="secondary-button outline"
+                        type="button"
+                        onClick={() =>
+                          updateReservationStatus(reservation.id, "rejected")
+                        }
+                      >
+                        Rechazar
+                      </button>
+                      <a
+                        className="secondary-button ghost"
+                        href={adminWhatsappLink(reservation)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        WhatsApp
+                      </a>
+                      <button
+                        className="secondary-button ghost"
+                        type="button"
+                        onClick={() => startReschedule(reservation)}
+                      >
+                        Reprogramar
+                      </button>
+                    </div>
+
+                    {rescheduleId === reservation.id && (
+                      <div className="reschedule-panel">
+                        <p className="helper-text">
+                          Reprogramar para {formatDate(adminSelectedDate)}
+                        </p>
+                        <div className="reschedule-controls">
+                          <select
+                            className="select-input"
+                            value={rescheduleTime}
+                            onChange={(event) =>
+                              setRescheduleTime(event.target.value)
+                            }
+                          >
+                            <option value="">Seleccionar horario</option>
+                            {availableSlots.map((slot) => (
+                              <option key={slot} value={slot}>
+                                {slot}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            className="secondary-button"
+                            type="button"
+                            onClick={applyReschedule}
+                            disabled={!rescheduleTime}
+                          >
+                            Guardar
+                          </button>
+                          <button
+                            className="secondary-button ghost"
+                            type="button"
+                            onClick={() => {
+                              setRescheduleId(null);
+                              setRescheduleTime("");
+                            }}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </section>
+      </main>
+    );
+  }
 
   if (screen === "home") {
     return (
@@ -577,17 +1054,15 @@ function App() {
 
           <div className="payment-card">
             <p className="summary-label">Medios de pago</p>
-            <a
-              className="mp-button"
-              href="https://mpago.li/24YRSY9"
-              target="_blank"
-              rel="noreferrer"
-            >
+            <button className="mp-button" type="button">
               <span className="mp-logo" aria-hidden="true">
                 MP
               </span>
               <span>Mercado Pago</span>
-            </a>
+            </button>
+            <p className="payment-note">
+              Te redirigimos a la app de Mercado Pago para completar el pago.
+            </p>
             <div className="alias-block">
               <p className="summary-label">Alias para transferencia</p>
               <div className="alias-row">
@@ -671,7 +1146,7 @@ function App() {
         <button
           className="primary-button"
           type="button"
-          onClick={() => setScreen("thanks")}
+          onClick={handleStartReservation}
         >
           Iniciar reserva
         </button>

@@ -279,6 +279,7 @@
   border: none;
   border-radius: 10px;
   height: 36px;
+  position: relative;
   display: grid;
   place-items: center;
   font-size: 12px;
@@ -349,17 +350,26 @@
   background: #ffffff;
 }
 
+.payment-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .mp-button {
   display: inline-flex;
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
   border-radius: 12px;
+  border: none;
   background: #009ee3;
   color: #ffffff;
   text-decoration: none;
   font-size: 14px;
   font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .mp-button:focus-visible {
@@ -474,4 +484,222 @@
   .time-grid {
     gap: 18px;
   }
+
+  .admin-panel {
+    padding: 20px 18px 32px;
+  }
+}
+
+.admin-screen {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  background: var(--bg);
+  color: var(--text-main);
+}
+
+.admin-panel {
+  width: min(720px, 100%);
+  padding: 24px 22px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.admin-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-calendar {
+  border: 1px solid #e1e1e1;
+  border-radius: 16px;
+  padding: 12px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.calendar-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--accent-strong);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.reservation-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.reservation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reservation-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.reservation-list {
+  display: grid;
+  gap: 14px;
+}
+
+.reservation-card {
+  border: 1px solid #e1e1e1;
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+}
+
+.reservation-info {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reservation-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.reservation-meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.status-pill {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #f1f1f1;
+  color: #555555;
+}
+
+.status-pill.approved {
+  background: #d8f5e4;
+  color: #1f7a4d;
+}
+
+.status-pill.rejected {
+  background: #fde5e2;
+  color: #b24a3a;
+}
+
+.status-pill.pending {
+  background: #fff5d6;
+  color: #8d6a00;
+}
+
+.reservation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.secondary-button {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.secondary-button.outline {
+  background: #ffffff;
+  border: 1px solid #d7d7d7;
+  color: var(--text-main);
+}
+
+.secondary-button.ghost {
+  background: #f1f1f1;
+  color: var(--text-main);
+}
+
+.secondary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reschedule-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.reschedule-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.select-input {
+  border: 1px solid #dedede;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #ffffff;
+}
+
+.empty-state {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.login-panel {
+  width: min(360px, 100%);
+}
+
+.login-header {
+  display: grid;
+  gap: 6px;
+}
+
+.login-form {
+  display: grid;
+  gap: 14px;
+}
+
+.login-error {
+  margin: 0;
+  font-size: 12px;
+  color: #d0392f;
+}
+
+.ghost-link {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
 }
