@@ -124,6 +124,13 @@ function App() {
   const service = services.find((item) => item.id === selectedService) || null;
   const deposit = service ? service.price * 0.5 : 0;
   const transferAlias = "alias.demo.test";
+  const whatsappNumber = "5490000000000";
+  const whatsappMessage = encodeURIComponent(
+    `Hola! Te envio el comprobante de mi reserva.\n\nServicio: ${
+      service?.name || "-"
+    }\nFecha: ${formatDate(selectedDate)}\nHorario: ${selectedTime}\nNombre: ${contactName}\nWhatsApp: ${contactWhatsapp}`
+  );
+  const whatsappLink = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`;
 
   const startBooking = () => {
     setSelectedService(null);
@@ -522,6 +529,93 @@ function App() {
     );
   }
 
+  if (screen === "thanks") {
+    return (
+      <main className="booking-screen">
+        <section className="booking-panel" aria-label="Reserva confirmada">
+          <header className="flow-header">
+            <button
+              className="icon-button"
+              type="button"
+              aria-label="Volver"
+              onClick={() => setScreen("payment")}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M15 6l-6 6 6 6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <div>
+              <p className="flow-title">Gracias por reservar</p>
+              <p className="flow-subtitle">
+                Te esperamos. Si pagás por transferencia, compartí el
+                comprobante.
+              </p>
+            </div>
+          </header>
+
+          <div className="summary-card">
+            <div>
+              <p className="summary-label">Servicio</p>
+              <p className="summary-value">{service?.name}</p>
+            </div>
+            <div>
+              <p className="summary-label">Fecha</p>
+              <p className="summary-value">{formatDate(selectedDate)}</p>
+            </div>
+            <div>
+              <p className="summary-label">Horario</p>
+              <p className="summary-value">{selectedTime}</p>
+            </div>
+          </div>
+
+          <div className="payment-card">
+            <p className="summary-label">Medios de pago</p>
+            <a
+              className="mp-button"
+              href="https://www.mercadopago.com.ar/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span className="mp-logo" aria-hidden="true">
+                MP
+              </span>
+              <span>Mercado Pago</span>
+            </a>
+            <div className="alias-block">
+              <p className="summary-label">Alias para transferencia</p>
+              <div className="alias-row">
+                <span className="alias-text">{transferAlias}</span>
+                <button
+                  className="copy-button"
+                  type="button"
+                  onClick={handleCopyAlias}
+                >
+                  {aliasCopied ? "Copiado" : "Copiar"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <a
+            className="primary-button"
+            href={whatsappLink}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Compartir comprobante por WhatsApp
+          </a>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="booking-screen">
       <section className="booking-panel" aria-label="Pago de seña">
@@ -574,26 +668,13 @@ function App() {
           </div>
         </div>
 
-        <div className="transfer-card">
-          <p className="summary-label">Alias para transferencia</p>
-          <div className="alias-row">
-            <span className="alias-text">{transferAlias}</span>
-            <button
-              className="copy-button"
-              type="button"
-              onClick={handleCopyAlias}
-            >
-              {aliasCopied ? "Copiado" : "Copiar"}
-            </button>
-          </div>
-          <p className="helper-text">
-            Si preferís transferencia, usá este alias.
-          </p>
-        </div>
-
-        <a className="primary-button" href="#" target="_blank" rel="noreferrer">
-          Pagar con Mercado Pago
-        </a>
+        <button
+          className="primary-button"
+          type="button"
+          onClick={() => setScreen("thanks")}
+        >
+          Iniciar reserva
+        </button>
       </section>
     </main>
   );

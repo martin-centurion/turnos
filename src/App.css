@@ -340,6 +340,51 @@
   background: #ffffff;
 }
 
+.payment-card {
+  border: 1px solid #e1e1e1;
+  border-radius: 16px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  background: #ffffff;
+}
+
+.mp-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #009ee3;
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.mp-button:focus-visible {
+  outline: 2px solid #111111;
+  outline-offset: 3px;
+}
+
+.mp-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #ffffff;
+  color: #009ee3;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.alias-block {
+  display: grid;
+  gap: 8px;
+}
+
 .transfer-card {
   border: 1px solid #e1e1e1;
   border-radius: 16px;
