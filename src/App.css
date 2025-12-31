@@ -565,6 +565,7 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  padding-bottom: 120px;
 }
 
 .admin-topbar {
@@ -675,6 +676,11 @@
   color: #8d6a00;
 }
 
+.status-pill.completed {
+  background: #e5edff;
+  color: #3a4e9d;
+}
+
 .reservation-actions {
   display: flex;
   flex-wrap: wrap;
@@ -774,4 +780,95 @@
   font-weight: 600;
   cursor: pointer;
   text-decoration: underline;
+}
+
+.admin-create-panel {
+  border: 1px solid #e1e1e1;
+  border-radius: 18px;
+  padding: 16px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+}
+
+.admin-create-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-create-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-menu-toggle {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  border: none;
+  background: var(--accent);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  z-index: 20;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.16);
+}
+
+.admin-menu-toggle svg {
+  width: 26px;
+  height: 26px;
+  fill: #ffffff;
+}
+
+.admin-menu-panel {
+  position: fixed;
+  right: 18px;
+  bottom: 78px;
+  width: min(280px, calc(100% - 36px));
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid #e1e1e1;
+  border-radius: 18px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  z-index: 19;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.16);
+}
+.filter-chip {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: #f1f1f1;
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filter-chip.active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.add-chip {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: var(--accent-strong);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-menu-panel .filter-chip,
+.admin-menu-panel .add-chip {
+  width: 100%;
+  justify-content: center;
 }

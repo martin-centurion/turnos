@@ -194,6 +194,12 @@ const loadReservations = () => {
   }
 };
 
+const generateReservationId = () => {
+  const base = Date.now().toString(36).toUpperCase();
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `RES-${base}-${rand}`;
+};
+
 function App() {
   const [route, setRoute] = useState(() =>
     getRouteFromPath(window.location.pathname)
@@ -207,6 +213,15 @@ function App() {
     toIsoDate(new Date())
   );
   const [reservations, setReservations] = useState(() => loadReservations());
+  const [adminFilter, setAdminFilter] = useState("all");
+  const [showCreateReservation, setShowCreateReservation] = useState(false);
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+  const [newReservation, setNewReservation] = useState(() => ({
+    name: "",
+    whatsapp: "",
+    service: services[0]?.name || "",
+    time: "",
+  }));
   const [rescheduleId, setRescheduleId] = useState(null);
   const [rescheduleTime, setRescheduleTime] = useState("");
   const [screen, setScreen] = useState("home");
@@ -217,6 +232,7 @@ function App() {
   const [contactName, setContactName] = useState("");
   const [contactWhatsapp, setContactWhatsapp] = useState("");
   const [aliasCopied, setAliasCopied] = useState(false);
+  const [reservationId, setReservationId] = useState("");
 
   const service = services.find((item) => item.id === selectedService) || null;
   const deposit = service ? service.price * 0.5 : 0;
@@ -225,7 +241,9 @@ function App() {
   const whatsappMessage = encodeURIComponent(
     `Hola! Te envio el comprobante de mi reserva.\n\nServicio: ${
       service?.name || "-"
-    }\nFecha: ${formatDate(selectedDate)}\nHorario: ${selectedTime}\nNombre: ${contactName}\nWhatsApp: ${contactWhatsapp}`
+    }\nFecha: ${formatDate(selectedDate)}\nHorario: ${selectedTime}\nNombre: ${contactName}\nWhatsApp: ${contactWhatsapp}\nID de reserva: ${
+      reservationId || "-"
+    }`
   );
   const whatsappLink = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`;
 
@@ -315,6 +333,7 @@ function App() {
     setContactName("");
     setContactWhatsapp("");
     setAliasCopied(false);
+    setReservationId("");
     setScreen("services");
   };
 
@@ -329,6 +348,7 @@ function App() {
   };
 
   const handleStartReservation = () => {
+    const newReservationId = reservationId || generateReservationId();
     const newReservation = {
       id:
         typeof crypto !== "undefined" && crypto.randomUUID
@@ -340,7 +360,9 @@ function App() {
       date: selectedDate,
       time: selectedTime,
       status: "pending",
+      reservationId: newReservationId,
     };
+    setReservationId(newReservationId);
     setReservations((prev) => [...prev, newReservation]);
     setScreen("thanks");
   };
@@ -370,6 +392,43 @@ function App() {
         reservation.id === id ? { ...reservation, status } : reservation
       )
     );
+  };
+
+  const startCreateReservation = () => {
+    setNewReservation({
+      name: "",
+      whatsapp: "",
+      service: services[0]?.name || "",
+      time: "",
+    });
+    setShowCreateReservation(true);
+  };
+
+  const handleCreateReservation = () => {
+    if (
+      !newReservation.name.trim() ||
+      !newReservation.whatsapp.trim() ||
+      !newReservation.service ||
+      !newReservation.time
+    ) {
+      return;
+    }
+    const reservationId = generateReservationId();
+    const created = {
+      id:
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}`,
+      name: newReservation.name.trim(),
+      whatsapp: newReservation.whatsapp.trim(),
+      service: newReservation.service,
+      date: adminSelectedDate,
+      time: newReservation.time,
+      status: "pending",
+      reservationId,
+    };
+    setReservations((prev) => [...prev, created]);
+    setShowCreateReservation(false);
   };
 
   const startReschedule = (reservation) => {
@@ -465,6 +524,9 @@ function App() {
     const dailyReservations = reservations.filter(
       (reservation) => reservation.date === adminSelectedDate
     );
+    const filteredReservations = dailyReservations.filter((reservation) =>
+      adminFilter === "all" ? true : reservation.status === adminFilter
+    );
     const pendingCount = reservations.filter(
       (reservation) => reservation.status === "pending"
     ).length;
@@ -472,6 +534,7 @@ function App() {
     const statusLabel = (status) => {
       if (status === "approved") return "Aprobada";
       if (status === "rejected") return "Rechazada";
+      if (status === "completed") return "Completada";
       return "Pendiente";
     };
 
@@ -604,26 +667,35 @@ function App() {
                 Reservas del {formatDate(adminSelectedDate)}
               </p>
               <span className="reservation-count">
-                {dailyReservations.length} reservas
+                {filteredReservations.length} reservas
               </span>
             </div>
 
-            {dailyReservations.length === 0 ? (
+            {filteredReservations.length === 0 ? (
               <div className="empty-state">
                 <p>No hay reservas para este día.</p>
-                {reservations.length > 0 && (
+                {dailyReservations.length > 0 && (
+                  <p>Probá con otro filtro de estado.</p>
+                )}
+                {reservations.length > 0 && dailyReservations.length === 0 && (
                   <p>Seleccioná un día con badge en el calendario.</p>
                 )}
               </div>
             ) : (
               <div className="reservation-list">
-                {dailyReservations.map((reservation) => (
+                {filteredReservations.map((reservation) => (
                   <article className="reservation-card" key={reservation.id}>
                     <div className="reservation-info">
                       <div>
                         <p className="reservation-name">{reservation.name}</p>
                         <p className="reservation-meta">
                           {reservation.service} · {reservation.time}
+                        </p>
+                        <p className="reservation-meta">
+                          ID:{" "}
+                          {reservation.reservationId ||
+                            reservation.paymentId ||
+                            "-"}
                         </p>
                         <p className="reservation-meta">
                           WhatsApp: {reservation.whatsapp}
@@ -643,6 +715,15 @@ function App() {
                         }
                       >
                         Aceptar
+                      </button>
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() =>
+                          updateReservationStatus(reservation.id, "completed")
+                        }
+                      >
+                        Completar
                       </button>
                       <button
                         className="secondary-button outline"
@@ -720,6 +801,180 @@ function App() {
               </div>
             )}
           </section>
+
+          {showCreateReservation && (
+            <section className="admin-create-panel" aria-label="Nueva reserva">
+              <div className="admin-create-header">
+                <p className="flow-title">Agregar reserva</p>
+                <button
+                  className="secondary-button ghost"
+                  type="button"
+                  onClick={() => setShowCreateReservation(false)}
+                >
+                  Cerrar
+                </button>
+              </div>
+              <p className="helper-text">
+                Fecha seleccionada: {formatDate(adminSelectedDate)}
+              </p>
+              <div className="admin-create-grid">
+                <label className="form-field">
+                  <span className="field-label">Nombre</span>
+                  <input
+                    className="text-input"
+                    type="text"
+                    value={newReservation.name}
+                    onChange={(event) =>
+                      setNewReservation((prev) => ({
+                        ...prev,
+                        name: event.target.value,
+                      }))
+                    }
+                    placeholder="Nombre y apellido"
+                  />
+                </label>
+                <label className="form-field">
+                  <span className="field-label">WhatsApp</span>
+                  <input
+                    className="text-input"
+                    type="tel"
+                    value={newReservation.whatsapp}
+                    onChange={(event) =>
+                      setNewReservation((prev) => ({
+                        ...prev,
+                        whatsapp: event.target.value,
+                      }))
+                    }
+                    placeholder="+54 9 11 1234 5678"
+                  />
+                </label>
+                <label className="form-field">
+                  <span className="field-label">Servicio</span>
+                  <select
+                    className="select-input"
+                    value={newReservation.service}
+                    onChange={(event) =>
+                      setNewReservation((prev) => ({
+                        ...prev,
+                        service: event.target.value,
+                        time: "",
+                      }))
+                    }
+                  >
+                    {services.map((item) => (
+                      <option key={item.id} value={item.name}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span className="field-label">Horario</span>
+                  <select
+                    className="select-input"
+                    value={newReservation.time}
+                    onChange={(event) =>
+                      setNewReservation((prev) => ({
+                        ...prev,
+                        time: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">Seleccionar horario</option>
+                    {getAvailableTimes(
+                      adminSelectedDate,
+                      newReservation.service
+                    ).map((slot) => (
+                      <option key={slot} value={slot}>
+                        {slot}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={handleCreateReservation}
+                disabled={
+                  !newReservation.name.trim() ||
+                  !newReservation.whatsapp.trim() ||
+                  !newReservation.service ||
+                  !newReservation.time
+                }
+              >
+                Guardar reserva
+              </button>
+            </section>
+          )}
+
+          <button
+            className="admin-menu-toggle"
+            type="button"
+            aria-label="Abrir menú"
+            onClick={() => setAdminMenuOpen((open) => !open)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" aria-hidden="true">
+              <path d="M64 160C64 142.3 78.3 128 96 128L480 128C497.7 128 512 142.3 512 160C512 177.7 497.7 192 480 192L96 192C78.3 192 64 177.7 64 160zM128 320C128 302.3 142.3 288 160 288L544 288C561.7 288 576 302.3 576 320C576 337.7 561.7 352 544 352L160 352C142.3 352 128 337.7 128 320zM512 480C512 497.7 497.7 512 480 512L96 512C78.3 512 64 497.7 64 480C64 462.3 78.3 448 96 448L480 448C497.7 448 512 462.3 512 480z" />
+            </svg>
+          </button>
+
+          {adminMenuOpen && (
+            <div className="admin-menu-panel" role="menu">
+              <button
+                className={`filter-chip ${
+                  adminFilter === "all" ? "active" : ""
+                }`}
+                type="button"
+                onClick={() => setAdminFilter("all")}
+              >
+                Todas
+              </button>
+              <button
+                className={`filter-chip ${
+                  adminFilter === "pending" ? "active" : ""
+                }`}
+                type="button"
+                onClick={() => setAdminFilter("pending")}
+              >
+                Pendientes
+              </button>
+              <button
+                className={`filter-chip ${
+                  adminFilter === "approved" ? "active" : ""
+                }`}
+                type="button"
+                onClick={() => setAdminFilter("approved")}
+              >
+                Aprobadas
+              </button>
+              <button
+                className={`filter-chip ${
+                  adminFilter === "rejected" ? "active" : ""
+                }`}
+                type="button"
+                onClick={() => setAdminFilter("rejected")}
+              >
+                Rechazadas
+              </button>
+              <button
+                className={`filter-chip ${
+                  adminFilter === "completed" ? "active" : ""
+                }`}
+                type="button"
+                onClick={() => setAdminFilter("completed")}
+              >
+                Completadas
+              </button>
+              <button
+                className="add-chip"
+                type="button"
+                onClick={startCreateReservation}
+              >
+                + Agregar
+              </button>
+            </div>
+          )}
         </section>
       </main>
     );
@@ -1151,6 +1406,10 @@ function App() {
             <div>
               <p className="summary-label">Horario</p>
               <p className="summary-value">{selectedTime}</p>
+            </div>
+            <div>
+              <p className="summary-label">ID de reserva</p>
+              <p className="summary-value">{reservationId || "-"}</p>
             </div>
           </div>
 
