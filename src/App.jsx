@@ -235,10 +235,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    fetchReservations();
-  }, []);
-
-  useEffect(() => {
     if (route === "admin" && !adminAuthed) {
       navigate("admin-login", "/login");
     }
@@ -290,7 +286,6 @@ function App() {
     setContactName("");
     setContactWhatsapp("");
     setAliasCopied(false);
-    setSubmitError("");
     setScreen("services");
   };
 
