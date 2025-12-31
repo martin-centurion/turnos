@@ -142,6 +142,35 @@ const buildAdminCalendarDays = (monthDate, countsByDate) => {
   return cells;
 };
 
+const bookingSteps = [
+  { id: "services", label: "Servicio" },
+  { id: "date", label: "Fecha" },
+  { id: "time", label: "Hora" },
+  { id: "contact", label: "Mis datos" },
+  { id: "payment", label: "Reservar" },
+  { id: "thanks", label: "Pago" },
+];
+
+const getStepIndex = (id) =>
+  bookingSteps.findIndex((step) => step.id === id);
+
+const Stepper = ({ current }) => (
+  <div className="stepper" aria-label="Progreso de la reserva">
+    {bookingSteps.map((step, index) => {
+      const status =
+        index < current ? "complete" : index === current ? "current" : "upcoming";
+      return (
+        <div key={step.id} className={`stepper-item ${status}`}>
+          <span className="stepper-dot" aria-hidden="true">
+            {index + 1}
+          </span>
+          <span className="stepper-label">{step.label}</span>
+        </div>
+      );
+    })}
+  </div>
+);
+
 const getRouteFromPath = (path) => {
   if (path.startsWith("/login")) return "admin-login";
   if (path.startsWith("/admin")) return "admin";
@@ -723,6 +752,7 @@ function App() {
     return (
       <main className="booking-screen">
         <section className="booking-panel" aria-label="Servicios disponibles">
+          <Stepper current={getStepIndex("services")} />
           <header className="flow-header">
             <button
               className="icon-button"
@@ -801,6 +831,7 @@ function App() {
     return (
       <main className="booking-screen">
         <section className="booking-panel" aria-label="Seleccionar fecha">
+          <Stepper current={getStepIndex("date")} />
           <header className="flow-header">
             <button
               className="icon-button"
@@ -946,6 +977,7 @@ function App() {
     return (
       <main className="booking-screen">
         <section className="booking-panel" aria-label="Seleccionar horario">
+          <Stepper current={getStepIndex("time")} />
           <header className="flow-header">
             <button
               className="icon-button"
@@ -1008,6 +1040,7 @@ function App() {
           className="booking-panel contact-panel"
           aria-label="Datos de contacto"
         >
+          <Stepper current={getStepIndex("contact")} />
           <header className="flow-header">
             <button
               className="icon-button"
@@ -1075,6 +1108,7 @@ function App() {
     return (
       <main className="booking-screen">
         <section className="booking-panel" aria-label="Reserva confirmada">
+          <Stepper current={getStepIndex("thanks")} />
           <header className="flow-header">
             <button
               className="icon-button"
@@ -1159,6 +1193,7 @@ function App() {
   return (
     <main className="booking-screen">
       <section className="booking-panel" aria-label="Pago de seña">
+        <Stepper current={getStepIndex("payment")} />
         <header className="flow-header">
           <button
             className="icon-button"

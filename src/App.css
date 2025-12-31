@@ -305,6 +305,67 @@
   pointer-events: none;
 }
 
+.stepper {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  padding: 6px 0 14px;
+  scrollbar-width: none;
+}
+
+.stepper::-webkit-scrollbar {
+  display: none;
+}
+
+.stepper-item {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.stepper-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #d9d9d9;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.stepper-item.complete,
+.stepper-item.current {
+  color: var(--text-main);
+}
+
+.stepper-item.complete .stepper-dot {
+  background: var(--accent-strong);
+}
+
+.stepper-item.current .stepper-dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79, 176, 174, 0.25);
+}
+
+.stepper-label {
+  text-align: center;
+  line-height: 1.2;
+}
+
+@media (max-width: 520px) {
+  .stepper {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    row-gap: 12px;
+  }
+}
+
 .time-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
