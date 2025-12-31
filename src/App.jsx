@@ -8,18 +8,6 @@ const contactLinks = [
   { label: "WhatsApp", href: "#" },
 ];
 
-const services = [
-  { id: "limpieza", name: "Limpieza facial", duration: "45 min", price: 18000 },
-  {
-    id: "masajes",
-    name: "Masajes relajantes",
-    duration: "60 min",
-    price: 22000,
-  },
-  { id: "cejas", name: "Diseño de cejas", duration: "30 min", price: 12000 },
-  { id: "manos", name: "Manicura spa", duration: "50 min", price: 15000 },
-];
-
 const buildTimeSlots = () => {
   const slots = [];
   for (let hour = 10; hour <= 20; hour += 1) {
@@ -28,10 +16,40 @@ const buildTimeSlots = () => {
   return slots;
 };
 
-const timeSlots = buildTimeSlots().map((time, index) => ({
-  time,
-  available: index % 5 !== 0,
-}));
+const timeSlots = buildTimeSlots();
+
+const defaultAvailableTimes = timeSlots;
+
+const initialServices = [
+  {
+    id: "limpieza",
+    name: "Limpieza facial",
+    duration: "45 min",
+    price: 18000,
+    availableTimes: defaultAvailableTimes,
+  },
+  {
+    id: "masajes",
+    name: "Masajes relajantes",
+    duration: "60 min",
+    price: 22000,
+    availableTimes: defaultAvailableTimes,
+  },
+  {
+    id: "cejas",
+    name: "Diseño de cejas",
+    duration: "30 min",
+    price: 12000,
+    availableTimes: defaultAvailableTimes,
+  },
+  {
+    id: "manos",
+    name: "Manicura spa",
+    duration: "50 min",
+    price: 15000,
+    availableTimes: defaultAvailableTimes,
+  },
+];
 
 const formatMoney = (value) =>
   new Intl.NumberFormat("es-AR", {
@@ -182,6 +200,25 @@ const normalizePhone = (value) => value.replace(/[^\d]/g, "");
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "admin123";
 
+const loadServices = () => {
+  if (typeof window === "undefined") return initialServices;
+  const stored = window.localStorage.getItem("turnos_services");
+  if (!stored) return initialServices;
+  try {
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return initialServices;
+    return parsed.map((service) => ({
+      ...service,
+      availableTimes:
+        service.availableTimes && service.availableTimes.length > 0
+          ? service.availableTimes
+          : defaultAvailableTimes,
+    }));
+  } catch (error) {
+    return initialServices;
+  }
+};
+
 const loadReservations = () => {
   if (typeof window === "undefined") return [];
   const stored = window.localStorage.getItem("turnos_reservations");
@@ -212,15 +249,27 @@ function App() {
   const [adminSelectedDate, setAdminSelectedDate] = useState(() =>
     toIsoDate(new Date())
   );
+  const [services, setServices] = useState(() => loadServices());
   const [reservations, setReservations] = useState(() => loadReservations());
   const [adminFilter, setAdminFilter] = useState("all");
   const [showCreateReservation, setShowCreateReservation] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const [adminPendingOpen, setAdminPendingOpen] = useState(false);
+  const [adminStatsOpen, setAdminStatsOpen] = useState(false);
+  const [adminStatsMonth, setAdminStatsMonth] = useState(() => new Date());
+  const [adminServicesOpen, setAdminServicesOpen] = useState(false);
+  const [serviceForm, setServiceForm] = useState(() => ({
+    id: "",
+    name: "",
+    duration: "",
+    price: "",
+    availableTimes: defaultAvailableTimes,
+  }));
+  const [isEditingService, setIsEditingService] = useState(false);
   const [newReservation, setNewReservation] = useState(() => ({
     name: "",
     whatsapp: "",
-    service: services[0]?.name || "",
+    serviceId: "",
     time: "",
   }));
   const [rescheduleId, setRescheduleId] = useState(null);
@@ -248,25 +297,41 @@ function App() {
   );
   const whatsappLink = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`;
 
-  const getBookedTimes = (date, serviceName, excludeId) => {
-    if (!date || !serviceName) return [];
+  const getBookedTimes = (date, serviceId, serviceName, excludeId) => {
+    if (!date || (!serviceId && !serviceName)) return [];
     return reservations
       .filter(
         (reservation) =>
           (reservation.status === "approved" ||
             reservation.status === "pending") &&
           reservation.date === date &&
-          reservation.service === serviceName &&
+          (reservation.serviceId
+            ? reservation.serviceId === serviceId
+            : reservation.service === serviceName) &&
           reservation.id !== excludeId
       )
       .map((reservation) => reservation.time);
   };
 
-  const getAvailableTimes = (date, serviceName, excludeId) => {
-    const bookedTimes = getBookedTimes(date, serviceName, excludeId);
-    return timeSlots
-      .filter((slot) => slot.available && !bookedTimes.includes(slot.time))
-      .map((slot) => slot.time);
+  const getServiceAvailability = (serviceId, serviceName) => {
+    const currentService = services.find((item) =>
+      serviceId ? item.id === serviceId : item.name === serviceName
+    );
+    if (currentService?.availableTimes?.length) {
+      return currentService.availableTimes;
+    }
+    return defaultAvailableTimes;
+  };
+
+  const getAvailableTimes = (date, serviceId, serviceName, excludeId) => {
+    const bookedTimes = getBookedTimes(
+      date,
+      serviceId,
+      serviceName,
+      excludeId
+    );
+    const baseTimes = getServiceAvailability(serviceId, serviceName);
+    return baseTimes.filter((time) => !bookedTimes.includes(time));
   };
 
   const navigate = (nextRoute, path) => {
@@ -310,6 +375,25 @@ function App() {
       JSON.stringify(reservations)
     );
   }, [reservations]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("turnos_services", JSON.stringify(services));
+  }, [services]);
+
+  useEffect(() => {
+    if (!services.length) return;
+    setNewReservation((prev) => {
+      if (prev.serviceId && services.some((s) => s.id === prev.serviceId)) {
+        return prev;
+      }
+      return {
+        ...prev,
+        serviceId: services[0].id,
+        time: "",
+      };
+    });
+  }, [services]);
 
   useEffect(() => {
     if (route !== "admin" || reservations.length === 0) return;
@@ -358,6 +442,7 @@ function App() {
       name: contactName.trim(),
       whatsapp: contactWhatsapp.trim(),
       service: service?.name || "Servicio",
+      serviceId: service?.id || "",
       date: selectedDate,
       time: selectedTime,
       status: "pending",
@@ -395,25 +480,58 @@ function App() {
     );
   };
 
+  const openStats = () => {
+    setAdminStatsOpen(true);
+    setAdminMenuOpen(false);
+    setShowCreateReservation(false);
+    setAdminPendingOpen(false);
+    setAdminServicesOpen(false);
+    setAdminStatsMonth(
+      new Date(adminMonth.getFullYear(), adminMonth.getMonth(), 1)
+    );
+  };
+
   const startCreateReservation = () => {
     setNewReservation({
       name: "",
       whatsapp: "",
-      service: services[0]?.name || "",
+      serviceId: services[0]?.id || "",
       time: "",
     });
     setShowCreateReservation(true);
+    setAdminMenuOpen(false);
+    setAdminServicesOpen(false);
+    setAdminStatsOpen(false);
+  };
+
+  const openServices = () => {
+    setAdminServicesOpen(true);
+    setAdminMenuOpen(false);
+    setShowCreateReservation(false);
+    setAdminPendingOpen(false);
+    setAdminStatsOpen(false);
+    setServiceForm({
+      id: "",
+      name: "",
+      duration: "",
+      price: "",
+      availableTimes: defaultAvailableTimes,
+    });
+    setIsEditingService(false);
   };
 
   const handleCreateReservation = () => {
     if (
       !newReservation.name.trim() ||
       !newReservation.whatsapp.trim() ||
-      !newReservation.service ||
+      !newReservation.serviceId ||
       !newReservation.time
     ) {
       return;
     }
+    const selectedServiceForNew = services.find(
+      (item) => item.id === newReservation.serviceId
+    );
     const reservationId = generateReservationId();
     const created = {
       id:
@@ -422,7 +540,8 @@ function App() {
           : `${Date.now()}`,
       name: newReservation.name.trim(),
       whatsapp: newReservation.whatsapp.trim(),
-      service: newReservation.service,
+      service: selectedServiceForNew?.name || "Servicio",
+      serviceId: newReservation.serviceId,
       date: adminSelectedDate,
       time: newReservation.time,
       status: "pending",
@@ -430,6 +549,100 @@ function App() {
     };
     setReservations((prev) => [...prev, created]);
     setShowCreateReservation(false);
+  };
+
+  const startEditService = (serviceItem) => {
+    setServiceForm({
+      id: serviceItem.id,
+      name: serviceItem.name,
+      duration: serviceItem.duration,
+      price: serviceItem.price,
+      availableTimes:
+        serviceItem.availableTimes && serviceItem.availableTimes.length > 0
+          ? serviceItem.availableTimes
+          : defaultAvailableTimes,
+    });
+    setIsEditingService(true);
+    setAdminServicesOpen(true);
+    setAdminMenuOpen(false);
+  };
+
+  const deleteService = (serviceId) => {
+    setServices((prev) => prev.filter((serviceItem) => serviceItem.id !== serviceId));
+    setReservations((prev) =>
+      prev.map((reservation) =>
+        reservation.serviceId === serviceId
+          ? { ...reservation, serviceId: "", service: reservation.service }
+          : reservation
+      )
+    );
+    if (selectedService === serviceId) {
+      setSelectedService(null);
+    }
+  };
+
+  const toggleServiceTime = (time) => {
+    setServiceForm((prev) => {
+      const hasTime = prev.availableTimes.includes(time);
+      const nextTimes = hasTime
+        ? prev.availableTimes.filter((item) => item !== time)
+        : [...prev.availableTimes, time];
+      return { ...prev, availableTimes: nextTimes };
+    });
+  };
+
+  const handleSaveService = () => {
+    const name = serviceForm.name.trim();
+    const duration = serviceForm.duration.trim();
+    const price = Number(serviceForm.price);
+    if (!name || !duration || Number.isNaN(price)) return;
+    const availableTimes = serviceForm.availableTimes.length
+      ? serviceForm.availableTimes
+      : defaultAvailableTimes;
+
+    if (isEditingService) {
+      setServices((prev) =>
+        prev.map((serviceItem) =>
+          serviceItem.id === serviceForm.id
+            ? {
+                ...serviceItem,
+                name,
+                duration,
+                price,
+                availableTimes,
+              }
+            : serviceItem
+        )
+      );
+      setReservations((prev) =>
+        prev.map((reservation) =>
+          reservation.serviceId === serviceForm.id
+            ? { ...reservation, service: name }
+            : reservation
+        )
+      );
+    } else {
+      const newService = {
+        id:
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `srv-${Date.now()}`,
+        name,
+        duration,
+        price,
+        availableTimes,
+      };
+      setServices((prev) => [...prev, newService]);
+    }
+
+    setServiceForm({
+      id: "",
+      name: "",
+      duration: "",
+      price: "",
+      availableTimes: defaultAvailableTimes,
+    });
+    setIsEditingService(false);
   };
 
   const startReschedule = (reservation) => {
@@ -552,6 +765,44 @@ function App() {
     };
 
     const monthLabel = `${months[adminMonth.getMonth()]} ${adminMonth.getFullYear()}`;
+    const statsMonthKey = `${adminStatsMonth.getFullYear()}-${String(
+      adminStatsMonth.getMonth() + 1
+    ).padStart(2, "0")}`;
+    const statsLabel = `${months[adminStatsMonth.getMonth()]} ${adminStatsMonth.getFullYear()}`;
+    const completedForMonth = reservations.filter(
+      (reservation) =>
+        reservation.status === "completed" &&
+        reservation.date.startsWith(statsMonthKey)
+    );
+    const servicePriceById = services.reduce((acc, serviceItem) => {
+      acc[serviceItem.id] = serviceItem.price;
+      return acc;
+    }, {});
+    const servicePriceByName = services.reduce((acc, serviceItem) => {
+      acc[serviceItem.name] = serviceItem.price;
+      return acc;
+    }, {});
+
+    const statsByService = completedForMonth.reduce((acc, reservation) => {
+      const serviceMatch = reservation.serviceId
+        ? services.find((item) => item.id === reservation.serviceId)
+        : null;
+      const resolvedName = serviceMatch ? serviceMatch.name : reservation.service;
+      const price =
+        reservation.serviceId && servicePriceById[reservation.serviceId]
+          ? servicePriceById[reservation.serviceId]
+          : servicePriceByName[reservation.service] || 0;
+      if (!acc[resolvedName]) {
+        acc[resolvedName] = { count: 0, total: 0 };
+      }
+      acc[resolvedName].count += 1;
+      acc[resolvedName].total += price;
+      return acc;
+    }, {});
+    const totalRevenue = Object.values(statsByService).reduce(
+      (sum, entry) => sum + entry.total,
+      0
+    );
 
     return (
       <main className="admin-screen">
@@ -649,6 +900,261 @@ function App() {
                   ))}
                 </div>
               )}
+            </section>
+          )}
+
+          {adminStatsOpen && (
+            <section className="admin-stats-panel" aria-label="Estadísticas">
+              <div className="admin-create-header">
+                <p className="flow-title">Estadísticas</p>
+                <button
+                  className="secondary-button ghost"
+                  type="button"
+                  onClick={() => setAdminStatsOpen(false)}
+                >
+                  Cerrar
+                </button>
+              </div>
+              <div className="stats-header">
+                <button
+                  className="icon-button calendar-nav"
+                  type="button"
+                  aria-label="Mes anterior"
+                  onClick={() =>
+                    setAdminStatsMonth(
+                      (current) =>
+                        new Date(
+                          current.getFullYear(),
+                          current.getMonth() - 1,
+                          1
+                        )
+                    )
+                  }
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M15 6l-6 6 6 6"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+                <p className="calendar-month">{statsLabel}</p>
+                <button
+                  className="icon-button calendar-nav"
+                  type="button"
+                  aria-label="Mes siguiente"
+                  onClick={() =>
+                    setAdminStatsMonth(
+                      (current) =>
+                        new Date(
+                          current.getFullYear(),
+                          current.getMonth() + 1,
+                          1
+                        )
+                    )
+                  }
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M9 6l6 6-6 6"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div className="stats-total">
+                <p className="summary-label">Total recaudado</p>
+                <p className="summary-value">{formatMoney(totalRevenue)}</p>
+              </div>
+              {completedForMonth.length === 0 ? (
+                <p className="empty-state">
+                  No hay reservas completadas este mes.
+                </p>
+              ) : (
+                <div className="stats-list">
+                  {Object.entries(statsByService).map(([serviceName, data]) => (
+                    <div className="stats-row" key={serviceName}>
+                      <div>
+                        <p className="reservation-name">{serviceName}</p>
+                        <p className="reservation-meta">
+                          {data.count} servicios completados
+                        </p>
+                      </div>
+                      <p className="summary-value">
+                        {formatMoney(data.total)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {adminServicesOpen && (
+            <section className="admin-services-panel" aria-label="Servicios">
+              <div className="admin-create-header">
+                <p className="flow-title">Administrar servicios</p>
+                <button
+                  className="secondary-button ghost"
+                  type="button"
+                  onClick={() => setAdminServicesOpen(false)}
+                >
+                  Cerrar
+                </button>
+              </div>
+
+              <div className="services-list">
+                {services.length === 0 ? (
+                  <p className="empty-state">
+                    No hay servicios cargados.
+                  </p>
+                ) : (
+                  services.map((serviceItem) => (
+                    <div className="service-item" key={serviceItem.id}>
+                      <div>
+                        <p className="reservation-name">{serviceItem.name}</p>
+                        <p className="reservation-meta">
+                          {serviceItem.duration} ·{" "}
+                          {formatMoney(serviceItem.price)}
+                        </p>
+                        <p className="reservation-meta">
+                          {serviceItem.availableTimes?.length || 0} horarios
+                          disponibles
+                        </p>
+                      </div>
+                      <div className="reservation-actions">
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => startEditService(serviceItem)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="secondary-button outline"
+                          type="button"
+                          onClick={() => deleteService(serviceItem.id)}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="service-form">
+                <p className="summary-label">
+                  {isEditingService ? "Editar servicio" : "Nuevo servicio"}
+                </p>
+                <div className="admin-create-grid">
+                  <label className="form-field">
+                    <span className="field-label">Nombre</span>
+                    <input
+                      className="text-input"
+                      type="text"
+                      value={serviceForm.name}
+                      onChange={(event) =>
+                        setServiceForm((prev) => ({
+                          ...prev,
+                          name: event.target.value,
+                        }))
+                      }
+                      placeholder="Ej: Limpieza facial"
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span className="field-label">Duración</span>
+                    <input
+                      className="text-input"
+                      type="text"
+                      value={serviceForm.duration}
+                      onChange={(event) =>
+                        setServiceForm((prev) => ({
+                          ...prev,
+                          duration: event.target.value,
+                        }))
+                      }
+                      placeholder="Ej: 45 min"
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span className="field-label">Precio</span>
+                    <input
+                      className="text-input"
+                      type="number"
+                      min="0"
+                      value={serviceForm.price}
+                      onChange={(event) =>
+                        setServiceForm((prev) => ({
+                          ...prev,
+                          price: event.target.value,
+                        }))
+                      }
+                      placeholder="Ej: 18000"
+                    />
+                  </label>
+                </div>
+
+                <p className="summary-label">Horarios disponibles</p>
+                <div className="service-times-grid">
+                  {timeSlots.map((time) => (
+                    <button
+                      key={time}
+                      type="button"
+                      className={`time-slot ${
+                        serviceForm.availableTimes.includes(time)
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() => toggleServiceTime(time)}
+                    >
+                      {time}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="service-form-actions">
+                  <button
+                    className="primary-button"
+                    type="button"
+                    onClick={handleSaveService}
+                    disabled={
+                      !serviceForm.name.trim() ||
+                      !serviceForm.duration.trim() ||
+                      Number.isNaN(Number(serviceForm.price))
+                    }
+                  >
+                    {isEditingService ? "Guardar cambios" : "Agregar servicio"}
+                  </button>
+                  {isEditingService && (
+                    <button
+                      className="secondary-button outline"
+                      type="button"
+                      onClick={() => {
+                        setServiceForm({
+                          id: "",
+                          name: "",
+                          duration: "",
+                          price: "",
+                          availableTimes: defaultAvailableTimes,
+                        });
+                        setIsEditingService(false);
+                      }}
+                    >
+                      Cancelar edición
+                    </button>
+                  )}
+                </div>
+              </div>
             </section>
           )}
 
@@ -849,6 +1355,7 @@ function App() {
                             <option value="">Seleccionar horario</option>
                             {getAvailableTimes(
                               adminSelectedDate,
+                              reservation.serviceId,
                               reservation.service,
                               reservation.id
                             ).map((slot) => (
@@ -934,17 +1441,17 @@ function App() {
                   <span className="field-label">Servicio</span>
                   <select
                     className="select-input"
-                    value={newReservation.service}
+                    value={newReservation.serviceId}
                     onChange={(event) =>
                       setNewReservation((prev) => ({
                         ...prev,
-                        service: event.target.value,
+                        serviceId: event.target.value,
                         time: "",
                       }))
                     }
                   >
                     {services.map((item) => (
-                      <option key={item.id} value={item.name}>
+                      <option key={item.id} value={item.id}>
                         {item.name}
                       </option>
                     ))}
@@ -965,7 +1472,9 @@ function App() {
                     <option value="">Seleccionar horario</option>
                     {getAvailableTimes(
                       adminSelectedDate,
-                      newReservation.service
+                      newReservation.serviceId,
+                      services.find((item) => item.id === newReservation.serviceId)
+                        ?.name
                     ).map((slot) => (
                       <option key={slot} value={slot}>
                         {slot}
@@ -981,7 +1490,7 @@ function App() {
                 disabled={
                   !newReservation.name.trim() ||
                   !newReservation.whatsapp.trim() ||
-                  !newReservation.service ||
+                  !newReservation.serviceId ||
                   !newReservation.time
                 }
               >
@@ -1016,6 +1525,12 @@ function App() {
 
           {adminMenuOpen && (
             <div className="admin-menu-panel" role="menu">
+              <button className="filter-chip" type="button" onClick={openStats}>
+                Estadísticas
+              </button>
+              <button className="filter-chip" type="button" onClick={openServices}>
+                Administrar servicios
+              </button>
               <button
                 className={`filter-chip ${
                   adminFilter === "all" ? "active" : ""
@@ -1325,7 +1840,12 @@ function App() {
   }
 
   if (screen === "time") {
-    const bookedTimes = getBookedTimes(selectedDate, service?.name);
+    const bookedTimes = getBookedTimes(
+      selectedDate,
+      service?.id,
+      service?.name
+    );
+    const visibleTimes = getServiceAvailability(service?.id, service?.name);
 
     return (
       <main className="booking-screen">
@@ -1358,17 +1878,17 @@ function App() {
           </header>
 
           <div className="time-grid">
-            {timeSlots.map((slot) => (
+            {visibleTimes.map((time) => (
               <button
-                key={slot.time}
+                key={time}
                 type="button"
                 className={`time-slot${
-                  selectedTime === slot.time ? " selected" : ""
+                  selectedTime === time ? " selected" : ""
                 }`}
-                disabled={!slot.available || bookedTimes.includes(slot.time)}
-                onClick={() => setSelectedTime(slot.time)}
+                disabled={bookedTimes.includes(time)}
+                onClick={() => setSelectedTime(time)}
               >
-                {slot.time}
+                {time}
               </button>
             ))}
           </div>
