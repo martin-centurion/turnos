@@ -575,6 +575,12 @@
   gap: 12px;
 }
 
+.admin-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .admin-calendar {
   border: 1px solid #e1e1e1;
   border-radius: 16px;
@@ -820,10 +826,90 @@
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.16);
 }
 
-.admin-menu-toggle svg {
+.admin-menu-toggle.is-open {
+  background: var(--accent-strong);
+}
+
+.menu-icon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.menu-icon svg {
   width: 26px;
   height: 26px;
   fill: #ffffff;
+}
+
+.menu-icon.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.menu-icon.hidden {
+  opacity: 0;
+  transform: scale(0.75);
+}
+
+.admin-notify-button {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid #e1e1e1;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+  position: relative;
+  cursor: pointer;
+}
+
+.admin-notify-button svg {
+  width: 22px;
+  height: 22px;
+  fill: var(--text-main);
+}
+
+.notify-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #f05b4f;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.pending-panel {
+  border: 1px solid #e1e1e1;
+  border-radius: 18px;
+  padding: 16px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+}
+
+.pending-list {
+  display: grid;
+  gap: 12px;
+}
+
+.pending-item {
+  border: 1px solid #e9e9e9;
+  border-radius: 14px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
 }
 
 .admin-menu-panel {

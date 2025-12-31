@@ -216,6 +216,7 @@ function App() {
   const [adminFilter, setAdminFilter] = useState("all");
   const [showCreateReservation, setShowCreateReservation] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+  const [adminPendingOpen, setAdminPendingOpen] = useState(false);
   const [newReservation, setNewReservation] = useState(() => ({
     name: "",
     whatsapp: "",
@@ -527,9 +528,10 @@ function App() {
     const filteredReservations = dailyReservations.filter((reservation) =>
       adminFilter === "all" ? true : reservation.status === adminFilter
     );
-    const pendingCount = reservations.filter(
+    const pendingReservations = reservations.filter(
       (reservation) => reservation.status === "pending"
-    ).length;
+    );
+    const pendingCount = pendingReservations.length;
 
     const statusLabel = (status) => {
       if (status === "approved") return "Aprobada";
@@ -561,14 +563,89 @@ function App() {
                 Pendientes: <strong>{pendingCount}</strong>
               </p>
             </div>
-            <button
-              className="secondary-button outline"
-              type="button"
-              onClick={handleAdminLogout}
-            >
-              Cerrar sesión
-            </button>
+            <div className="admin-actions">
+              <button
+                className="admin-notify-button"
+                type="button"
+                aria-label="Ver reservas pendientes"
+                onClick={() => setAdminPendingOpen((open) => !open)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" aria-hidden="true">
+                  <path d="M320 64C306.7 64 296 74.7 296 88L296 97.7C214.6 109.3 152 179.4 152 264L152 278.5C152 316.2 142 353.2 123 385.8L101.1 423.2C97.8 429 96 435.5 96 442.2C96 463.1 112.9 480 133.8 480L506.2 480C527.1 480 544 463.1 544 442.2C544 435.5 542.2 428.9 538.9 423.2L517 385.7C498 353.1 488 316.1 488 278.4L488 263.9C488 179.3 425.4 109.2 344 97.6L344 87.9C344 74.6 333.3 63.9 320 63.9zM488.4 432L151.5 432L164.4 409.9C187.7 370 200 324.6 200 278.5L200 264C200 197.7 253.7 144 320 144C386.3 144 440 197.7 440 264L440 278.5C440 324.7 452.3 370 475.5 409.9L488.4 432zM252.1 528C262 556 288.7 576 320 576C351.3 576 378 556 387.9 528L252.1 528z" />
+                </svg>
+                {pendingCount > 0 && (
+                  <span className="notify-badge" aria-hidden="true">
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+              <button
+                className="secondary-button outline"
+                type="button"
+                onClick={handleAdminLogout}
+              >
+                Cerrar sesión
+              </button>
+            </div>
           </header>
+
+          {adminPendingOpen && (
+            <section className="pending-panel" aria-label="Reservas pendientes">
+              <div className="admin-create-header">
+                <p className="flow-title">Pendientes de aprobación</p>
+                <button
+                  className="secondary-button ghost"
+                  type="button"
+                  onClick={() => setAdminPendingOpen(false)}
+                >
+                  Cerrar
+                </button>
+              </div>
+              {pendingReservations.length === 0 ? (
+                <p className="empty-state">No hay reservas pendientes.</p>
+              ) : (
+                <div className="pending-list">
+                  {pendingReservations.map((reservation) => (
+                    <div className="pending-item" key={reservation.id}>
+                      <div>
+                        <p className="reservation-name">{reservation.name}</p>
+                        <p className="reservation-meta">
+                          {reservation.service} · {formatDate(reservation.date)} ·{" "}
+                          {reservation.time}
+                        </p>
+                        <p className="reservation-meta">
+                          ID:{" "}
+                          {reservation.reservationId ||
+                            reservation.paymentId ||
+                            "-"}
+                        </p>
+                      </div>
+                      <div className="reservation-actions">
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() =>
+                            updateReservationStatus(reservation.id, "approved")
+                          }
+                        >
+                          Aprobar
+                        </button>
+                        <button
+                          className="secondary-button outline"
+                          type="button"
+                          onClick={() =>
+                            updateReservationStatus(reservation.id, "rejected")
+                          }
+                        >
+                          Rechazar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
 
           <section className="admin-calendar">
             <div className="calendar-header">
@@ -909,14 +986,27 @@ function App() {
           )}
 
           <button
-            className="admin-menu-toggle"
+            className={`admin-menu-toggle ${adminMenuOpen ? "is-open" : ""}`}
             type="button"
-            aria-label="Abrir menú"
+            aria-label={adminMenuOpen ? "Cerrar menú" : "Abrir menú"}
             onClick={() => setAdminMenuOpen((open) => !open)}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" aria-hidden="true">
-              <path d="M64 160C64 142.3 78.3 128 96 128L480 128C497.7 128 512 142.3 512 160C512 177.7 497.7 192 480 192L96 192C78.3 192 64 177.7 64 160zM128 320C128 302.3 142.3 288 160 288L544 288C561.7 288 576 302.3 576 320C576 337.7 561.7 352 544 352L160 352C142.3 352 128 337.7 128 320zM512 480C512 497.7 497.7 512 480 512L96 512C78.3 512 64 497.7 64 480C64 462.3 78.3 448 96 448L480 448C497.7 448 512 462.3 512 480z" />
-            </svg>
+            <span
+              className={`menu-icon ${adminMenuOpen ? "" : "visible"}`}
+              aria-hidden="true"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                <path d="M64 160C64 142.3 78.3 128 96 128L480 128C497.7 128 512 142.3 512 160C512 177.7 497.7 192 480 192L96 192C78.3 192 64 177.7 64 160zM128 320C128 302.3 142.3 288 160 288L544 288C561.7 288 576 302.3 576 320C576 337.7 561.7 352 544 352L160 352C142.3 352 128 337.7 128 320zM512 480C512 497.7 497.7 512 480 512L96 512C78.3 512 64 497.7 64 480C64 462.3 78.3 448 96 448L480 448C497.7 448 512 462.3 512 480z" />
+              </svg>
+            </span>
+            <span
+              className={`menu-icon ${adminMenuOpen ? "visible" : ""}`}
+              aria-hidden="true"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                <path d="M504.6 148.5C515.9 134.9 514.1 114.7 500.5 103.4C486.9 92.1 466.7 93.9 455.4 107.5L320 270L184.6 107.5C173.3 93.9 153.1 92.1 139.5 103.4C125.9 114.7 124.1 134.9 135.4 148.5L278.3 320L135.4 491.5C124.1 505.1 125.9 525.3 139.5 536.6C153.1 547.9 173.3 546.1 184.6 532.5L320 370L455.4 532.5C466.7 546.1 486.9 547.9 500.5 536.6C514.1 525.3 515.9 505.1 504.6 491.5L361.7 320L504.6 148.5z" />
+              </svg>
+            </span>
           </button>
 
           {adminMenuOpen && (
