@@ -11,6 +11,15 @@ const buildTimeSlots = () => {
 };
 
 const defaultAvailableTimes = buildTimeSlots();
+const defaultAvailableDays = [1, 2, 3, 4, 5, 6];
+
+const normalizeDays = (value) => {
+  if (!Array.isArray(value)) return defaultAvailableDays;
+  const normalized = value
+    .map((day) => Number(day))
+    .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6);
+  return normalized.length ? normalized : defaultAvailableDays;
+};
 
 const getSupabase = () => {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -30,6 +39,7 @@ const mapDbToService = (row) => ({
     Array.isArray(row.available_times) && row.available_times.length > 0
       ? row.available_times
       : defaultAvailableTimes,
+  availableDays: normalizeDays(row.available_days),
 });
 
 export default async function handler(req, res) {
@@ -54,7 +64,7 @@ export default async function handler(req, res) {
     const body = typeof rawBody === "string" ? JSON.parse(rawBody) : rawBody;
 
     if (method === "POST") {
-      const { name, duration, price, availableTimes } = body;
+      const { name, duration, price, availableTimes, availableDays } = body;
       const normalizedPrice = Number(price);
       if (!name || !duration || Number.isNaN(normalizedPrice)) {
         res.status(400).json({ error: "Faltan datos obligatorios." });
@@ -68,6 +78,7 @@ export default async function handler(req, res) {
           Array.isArray(availableTimes) && availableTimes.length > 0
             ? availableTimes
             : defaultAvailableTimes,
+        available_days: normalizeDays(availableDays),
       };
       const { data, error } = await supabase
         .from("services")
@@ -83,7 +94,7 @@ export default async function handler(req, res) {
     }
 
     if (method === "PATCH") {
-      const { id, name, duration, price, availableTimes } = body;
+      const { id, name, duration, price, availableTimes, availableDays } = body;
       if (!id) {
         res.status(400).json({ error: "Falta el id del servicio." });
         return;
@@ -104,6 +115,9 @@ export default async function handler(req, res) {
         updates.available_times = availableTimes.length
           ? availableTimes
           : defaultAvailableTimes;
+      }
+      if (Array.isArray(availableDays)) {
+        updates.available_days = normalizeDays(availableDays);
       }
 
       if (Object.keys(updates).length === 0) {

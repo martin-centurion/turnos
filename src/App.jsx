@@ -23,6 +23,42 @@ const buildTimeSlots = () => {
 const timeSlots = buildTimeSlots();
 
 const defaultAvailableTimes = timeSlots;
+const defaultAvailableDays = [1, 2, 3, 4, 5, 6];
+
+const weekdayOptions = [
+  { value: 1, label: "L" },
+  { value: 2, label: "M" },
+  { value: 3, label: "X" },
+  { value: 4, label: "J" },
+  { value: 5, label: "V" },
+  { value: 6, label: "S" },
+  { value: 0, label: "D" },
+];
+
+const weekdayOrderIndex = weekdayOptions.reduce((acc, day, index) => {
+  acc[day.value] = index;
+  return acc;
+}, {});
+
+const formatDayLabels = (days) => {
+  if (!Array.isArray(days) || days.length === 0) return "Sin días";
+  return [...days]
+    .map((day) => Number(day))
+    .sort(
+      (a, b) => (weekdayOrderIndex[a] ?? 99) - (weekdayOrderIndex[b] ?? 99)
+    )
+    .map((day) => weekdayOptions.find((item) => item.value === day)?.label)
+    .filter(Boolean)
+    .join(", ");
+};
+
+const normalizeAvailableDays = (days) => {
+  if (!Array.isArray(days)) return defaultAvailableDays;
+  const normalized = days
+    .map((day) => Number(day))
+    .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6);
+  return normalized.length ? normalized : defaultAvailableDays;
+};
 
 const initialServices = [
   {
@@ -31,6 +67,7 @@ const initialServices = [
     duration: "45 min",
     price: 18000,
     availableTimes: defaultAvailableTimes,
+    availableDays: defaultAvailableDays,
   },
   {
     id: "masajes",
@@ -38,6 +75,7 @@ const initialServices = [
     duration: "60 min",
     price: 22000,
     availableTimes: defaultAvailableTimes,
+    availableDays: defaultAvailableDays,
   },
   {
     id: "cejas",
@@ -45,6 +83,7 @@ const initialServices = [
     duration: "30 min",
     price: 12000,
     availableTimes: defaultAvailableTimes,
+    availableDays: defaultAvailableDays,
   },
   {
     id: "manos",
@@ -52,6 +91,7 @@ const initialServices = [
     duration: "50 min",
     price: 15000,
     availableTimes: defaultAvailableTimes,
+    availableDays: defaultAvailableDays,
   },
 ];
 
@@ -75,9 +115,12 @@ const toIsoDate = (date) => {
   return `${year}-${month}-${day}`;
 };
 
-const isBusinessDay = (value) => {
+const isAllowedDay = (value, allowedDays) => {
   if (!value) return false;
   const day = new Date(`${value}T00:00:00`).getDay();
+  if (Array.isArray(allowedDays) && allowedDays.length > 0) {
+    return allowedDays.includes(day);
+  }
   return day !== 0;
 };
 
@@ -98,7 +141,7 @@ const months = [
 
 const weekdays = ["L", "M", "X", "J", "V", "S", "D"];
 
-const buildCalendarDays = (monthDate) => {
+const buildCalendarDays = (monthDate, allowedDays) => {
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
   const firstOfMonth = new Date(year, month, 1);
@@ -115,7 +158,7 @@ const buildCalendarDays = (monthDate) => {
   for (let day = 1; day <= daysInMonth; day += 1) {
     const date = new Date(year, month, day);
     const iso = toIsoDate(date);
-    const disabled = date < today || !isBusinessDay(iso);
+    const disabled = date < today || !isAllowedDay(iso, allowedDays);
     cells.push({
       key: iso,
       date,
@@ -217,6 +260,7 @@ const loadLocalServices = () => {
         service.availableTimes && service.availableTimes.length > 0
           ? service.availableTimes
           : defaultAvailableTimes,
+      availableDays: normalizeAvailableDays(service.availableDays),
     }));
   } catch (error) {
     return initialServices;
@@ -281,6 +325,7 @@ function App() {
     duration: "",
     price: "",
     availableTimes: defaultAvailableTimes,
+    availableDays: defaultAvailableDays,
   }));
   const [isEditingService, setIsEditingService] = useState(false);
   const [newReservation, setNewReservation] = useState(() => ({
@@ -340,6 +385,13 @@ function App() {
       return currentService.availableTimes;
     }
     return defaultAvailableTimes;
+  };
+
+  const getServiceDays = (serviceId, serviceName) => {
+    const currentService = services.find((item) =>
+      serviceId ? item.id === serviceId : item.name === serviceName
+    );
+    return normalizeAvailableDays(currentService?.availableDays);
   };
 
   const getAvailableTimes = (date, serviceId, serviceName, excludeId) => {
@@ -668,6 +720,7 @@ function App() {
       duration: "",
       price: "",
       availableTimes: defaultAvailableTimes,
+      availableDays: defaultAvailableDays,
     });
     setIsEditingService(false);
   };
@@ -747,6 +800,10 @@ function App() {
         serviceItem.availableTimes && serviceItem.availableTimes.length > 0
           ? serviceItem.availableTimes
           : defaultAvailableTimes,
+      availableDays:
+        serviceItem.availableDays && serviceItem.availableDays.length > 0
+          ? serviceItem.availableDays
+          : defaultAvailableDays,
     });
     setIsEditingService(true);
     setAdminServicesOpen(true);
@@ -810,6 +867,16 @@ function App() {
     });
   };
 
+  const toggleServiceDay = (day) => {
+    setServiceForm((prev) => {
+      const hasDay = prev.availableDays.includes(day);
+      const nextDays = hasDay
+        ? prev.availableDays.filter((item) => item !== day)
+        : [...prev.availableDays, day];
+      return { ...prev, availableDays: nextDays };
+    });
+  };
+
   const handleSaveService = async () => {
     setServiceActionError("");
     const name = serviceForm.name.trim();
@@ -819,6 +886,9 @@ function App() {
     const availableTimes = serviceForm.availableTimes.length
       ? serviceForm.availableTimes
       : defaultAvailableTimes;
+    const availableDays = serviceForm.availableDays.length
+      ? serviceForm.availableDays
+      : defaultAvailableDays;
 
     if (isEditingService) {
       if (useLocalStorage) {
@@ -831,6 +901,7 @@ function App() {
                   duration,
                   price,
                   availableTimes,
+                  availableDays,
                 }
               : serviceItem
           )
@@ -854,6 +925,7 @@ function App() {
               duration,
               price,
               availableTimes,
+              availableDays,
             }),
           });
           if (!response.ok) {
@@ -890,6 +962,7 @@ function App() {
           duration,
           price,
           availableTimes,
+          availableDays,
         };
         setServices((prev) => [...prev, newService]);
       } else {
@@ -903,6 +976,7 @@ function App() {
               duration,
               price,
               availableTimes,
+              availableDays,
             }),
           });
           if (!response.ok) {
@@ -925,6 +999,7 @@ function App() {
       duration: "",
       price: "",
       availableTimes: defaultAvailableTimes,
+      availableDays: defaultAvailableDays,
     });
     setIsEditingService(false);
   };
@@ -1362,6 +1437,9 @@ function App() {
                           {serviceItem.availableTimes?.length || 0} horarios
                           disponibles
                         </p>
+                        <p className="reservation-meta">
+                          Días: {formatDayLabels(serviceItem.availableDays)}
+                        </p>
                       </div>
                       <div className="reservation-actions">
                         <button
@@ -1439,6 +1517,24 @@ function App() {
                   </label>
                 </div>
 
+                <p className="summary-label">Días disponibles</p>
+                <div className="service-days-grid">
+                  {weekdayOptions.map((day) => (
+                    <button
+                      key={day.value}
+                      type="button"
+                      className={`day-chip ${
+                        serviceForm.availableDays.includes(day.value)
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() => toggleServiceDay(day.value)}
+                    >
+                      {day.label}
+                    </button>
+                  ))}
+                </div>
+
                 <p className="summary-label">Horarios disponibles</p>
                 <div className="service-times-grid">
                   {timeSlots.map((time) => (
@@ -1486,6 +1582,7 @@ function App() {
                           duration: "",
                           price: "",
                           availableTimes: defaultAvailableTimes,
+                          availableDays: defaultAvailableDays,
                         });
                         setIsEditingService(false);
                       }}
@@ -2047,6 +2144,7 @@ function App() {
     const today = new Date();
     const minMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const isPrevDisabled = monthStart <= minMonth;
+    const allowedDays = getServiceDays(service?.id, service?.name);
 
     return (
       <main className="booking-screen">
@@ -2148,7 +2246,7 @@ function App() {
                 ))}
               </div>
               <div className="calendar-grid">
-                {buildCalendarDays(calendarMonth).map((cell) => {
+                {buildCalendarDays(calendarMonth, allowedDays).map((cell) => {
                   if (cell.empty) {
                     return (
                       <span key={cell.key} className="calendar-cell empty" />
@@ -2175,7 +2273,7 @@ function App() {
             </div>
           </div>
           <p className="helper-text">
-            Horarios disponibles de lunes a sábado, 10:00 a 20:00.
+            Días disponibles: {formatDayLabels(allowedDays)} · 10:00 a 20:00.
           </p>
 
           <button

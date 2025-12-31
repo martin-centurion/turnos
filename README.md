@@ -32,8 +32,12 @@ create table if not exists services (
   name text not null,
   duration text not null,
   price numeric not null,
-  available_times jsonb not null default '[]'::jsonb
+  available_times jsonb not null default '[]'::jsonb,
+  available_days jsonb not null default '[]'::jsonb
 );
+
+-- Si ya tenías la tabla creada:
+-- alter table services add column if not exists available_days jsonb not null default '[]'::jsonb;
 ```
 
 ### 2) Variables de entorno

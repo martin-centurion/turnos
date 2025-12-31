@@ -539,6 +539,7 @@
 .icon-button:focus-visible,
 .service-card:focus-visible,
 .time-slot:focus-visible,
+.day-chip:focus-visible,
 .calendar-cell:focus-visible {
   outline: 2px solid #111111;
   outline-offset: 3px;
@@ -860,6 +861,27 @@
 .service-form {
   display: grid;
   gap: 12px;
+}
+
+.service-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.day-chip {
+  border: 1px solid #e1e1e1;
+  border-radius: 10px;
+  padding: 10px 0;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.day-chip.selected {
+  border-color: var(--accent-strong);
+  background: #f3ffd3;
 }
 
 .service-times-grid {
