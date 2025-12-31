@@ -558,10 +558,15 @@ function App() {
         <section className="admin-panel" aria-label="Panel de reservas">
           <header className="admin-topbar">
             <div>
-              <p className="flow-title">Reservas</p>
-              <p className="flow-subtitle">
-                Pendientes: <strong>{pendingCount}</strong>
-              </p>
+              <div className="admin-title">
+                <div className="logo-badge admin-logo small">
+                  <span>Logo</span>
+                </div>
+                <div className="admin-title-text">
+                  <p className="company-name">Su Empresa</p>
+                  <p className="flow-title">Reservas</p>
+                </div>
+              </div>
             </div>
             <div className="admin-actions">
               <button

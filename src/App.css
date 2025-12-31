@@ -90,6 +90,13 @@
   font-weight: 700;
 }
 
+.admin-title .flow-title {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 .flow-subtitle {
   margin: 6px 0 0;
   font-size: 13px;
@@ -579,6 +586,31 @@
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.admin-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-title-text {
+  display: grid;
+  gap: 4px;
+  align-items: center;
+}
+
+.logo-badge.small {
+  width: 46px;
+  height: 46px;
+  font-size: 10px;
+}
+
+.company-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
 }
 
 .admin-calendar {
