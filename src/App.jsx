@@ -1,5 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import "./App.css";
+
+const useLocalStorage = import.meta.env.VITE_USE_LOCAL_STORAGE === "true";
+const reservationsEndpoint = "/api/reservations";
 
 const contactLinks = [
   { label: "Sitio Web", href: "#" },
@@ -219,7 +222,7 @@ const loadServices = () => {
   }
 };
 
-const loadReservations = () => {
+const loadLocalReservations = () => {
   if (typeof window === "undefined") return [];
   const stored = window.localStorage.getItem("turnos_reservations");
   if (!stored) return [];
@@ -250,7 +253,11 @@ function App() {
     toIsoDate(new Date())
   );
   const [services, setServices] = useState(() => loadServices());
-  const [reservations, setReservations] = useState(() => loadReservations());
+  const [reservations, setReservations] = useState(() =>
+    useLocalStorage ? loadLocalReservations() : []
+  );
+  const [reservationsLoading, setReservationsLoading] = useState(!useLocalStorage);
+  const [reservationsError, setReservationsError] = useState("");
   const [adminFilter, setAdminFilter] = useState("all");
   const [showCreateReservation, setShowCreateReservation] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
@@ -258,6 +265,9 @@ function App() {
   const [adminStatsOpen, setAdminStatsOpen] = useState(false);
   const [adminStatsMonth, setAdminStatsMonth] = useState(() => new Date());
   const [adminServicesOpen, setAdminServicesOpen] = useState(false);
+  const [adminCreateError, setAdminCreateError] = useState("");
+  const [adminCreateLoading, setAdminCreateLoading] = useState(false);
+  const [adminUpdateError, setAdminUpdateError] = useState("");
   const [serviceForm, setServiceForm] = useState(() => ({
     id: "",
     name: "",
@@ -283,6 +293,8 @@ function App() {
   const [contactWhatsapp, setContactWhatsapp] = useState("");
   const [aliasCopied, setAliasCopied] = useState(false);
   const [reservationId, setReservationId] = useState("");
+  const [isSubmittingReservation, setIsSubmittingReservation] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const service = services.find((item) => item.id === selectedService) || null;
   const deposit = service ? service.price * 0.5 : 0;
@@ -368,8 +380,34 @@ function App() {
     }
   }, [adminMonth]);
 
+  const fetchReservations = useCallback(async () => {
+    if (useLocalStorage) {
+      setReservations(loadLocalReservations());
+      setReservationsLoading(false);
+      return;
+    }
+    setReservationsLoading(true);
+    setReservationsError("");
+    try {
+      const response = await fetch(reservationsEndpoint);
+      if (!response.ok) {
+        throw new Error("Request failed");
+      }
+      const data = await response.json();
+      setReservations(data);
+    } catch (error) {
+      setReservationsError("No se pudieron cargar las reservas.");
+    } finally {
+      setReservationsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    fetchReservations();
+  }, [fetchReservations]);
+
+  useEffect(() => {
+    if (!useLocalStorage || typeof window === "undefined") return;
     window.localStorage.setItem(
       "turnos_reservations",
       JSON.stringify(reservations)
@@ -419,6 +457,7 @@ function App() {
     setContactWhatsapp("");
     setAliasCopied(false);
     setReservationId("");
+    setSubmitError("");
     setScreen("services");
   };
 
@@ -432,25 +471,59 @@ function App() {
     }
   };
 
-  const handleStartReservation = () => {
+  const handleStartReservation = async () => {
+    setSubmitError("");
     const newReservationId = reservationId || generateReservationId();
-    const newReservation = {
-      id:
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `${Date.now()}`,
-      name: contactName.trim(),
-      whatsapp: contactWhatsapp.trim(),
-      service: service?.name || "Servicio",
-      serviceId: service?.id || "",
-      date: selectedDate,
-      time: selectedTime,
-      status: "pending",
-      reservationId: newReservationId,
-    };
-    setReservationId(newReservationId);
-    setReservations((prev) => [...prev, newReservation]);
-    setScreen("thanks");
+
+    if (useLocalStorage) {
+      const newReservation = {
+        id:
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `${Date.now()}`,
+        name: contactName.trim(),
+        whatsapp: contactWhatsapp.trim(),
+        service: service?.name || "Servicio",
+        serviceId: service?.id || "",
+        date: selectedDate,
+        time: selectedTime,
+        status: "pending",
+        reservationId: newReservationId,
+      };
+      setReservationId(newReservationId);
+      setReservations((prev) => [...prev, newReservation]);
+      setScreen("thanks");
+      return;
+    }
+
+    setIsSubmittingReservation(true);
+    try {
+      const response = await fetch(reservationsEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: contactName.trim(),
+          whatsapp: contactWhatsapp.trim(),
+          service: service?.name || "Servicio",
+          serviceId: service?.id || "",
+          date: selectedDate,
+          time: selectedTime,
+          status: "pending",
+          reservationId: newReservationId,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("Request failed");
+      }
+      const created = await response.json();
+      setReservationId(created.reservationId);
+      setReservations((prev) => [...prev, created]);
+      setScreen("thanks");
+    } catch (error) {
+      setSubmitError("No se pudo guardar la reserva. Intenta de nuevo.");
+    } finally {
+      setIsSubmittingReservation(false);
+    }
   };
 
   const handleAdminLogin = (event) => {
@@ -472,12 +545,35 @@ function App() {
     navigate("admin-login", "/login");
   };
 
-  const updateReservationStatus = (id, status) => {
-    setReservations((prev) =>
-      prev.map((reservation) =>
-        reservation.id === id ? { ...reservation, status } : reservation
-      )
-    );
+  const updateReservationStatus = async (id, status) => {
+    setAdminUpdateError("");
+    if (useLocalStorage) {
+      setReservations((prev) =>
+        prev.map((reservation) =>
+          reservation.id === id ? { ...reservation, status } : reservation
+        )
+      );
+      return;
+    }
+
+    try {
+      const response = await fetch(reservationsEndpoint, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status }),
+      });
+      if (!response.ok) {
+        throw new Error("Request failed");
+      }
+      const updated = await response.json();
+      setReservations((prev) =>
+        prev.map((reservation) =>
+          reservation.id === id ? updated : reservation
+        )
+      );
+    } catch (error) {
+      setAdminUpdateError("No se pudo actualizar la reserva.");
+    }
   };
 
   const openStats = () => {
@@ -486,6 +582,8 @@ function App() {
     setShowCreateReservation(false);
     setAdminPendingOpen(false);
     setAdminServicesOpen(false);
+    setAdminCreateError("");
+    setAdminUpdateError("");
     setAdminStatsMonth(
       new Date(adminMonth.getFullYear(), adminMonth.getMonth(), 1)
     );
@@ -502,6 +600,8 @@ function App() {
     setAdminMenuOpen(false);
     setAdminServicesOpen(false);
     setAdminStatsOpen(false);
+    setAdminCreateError("");
+    setAdminUpdateError("");
   };
 
   const openServices = () => {
@@ -510,6 +610,8 @@ function App() {
     setShowCreateReservation(false);
     setAdminPendingOpen(false);
     setAdminStatsOpen(false);
+    setAdminCreateError("");
+    setAdminUpdateError("");
     setServiceForm({
       id: "",
       name: "",
@@ -520,7 +622,7 @@ function App() {
     setIsEditingService(false);
   };
 
-  const handleCreateReservation = () => {
+  const handleCreateReservation = async () => {
     if (
       !newReservation.name.trim() ||
       !newReservation.whatsapp.trim() ||
@@ -533,22 +635,55 @@ function App() {
       (item) => item.id === newReservation.serviceId
     );
     const reservationId = generateReservationId();
-    const created = {
-      id:
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `${Date.now()}`,
-      name: newReservation.name.trim(),
-      whatsapp: newReservation.whatsapp.trim(),
-      service: selectedServiceForNew?.name || "Servicio",
-      serviceId: newReservation.serviceId,
-      date: adminSelectedDate,
-      time: newReservation.time,
-      status: "pending",
-      reservationId,
-    };
-    setReservations((prev) => [...prev, created]);
-    setShowCreateReservation(false);
+
+    if (useLocalStorage) {
+      const created = {
+        id:
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `${Date.now()}`,
+        name: newReservation.name.trim(),
+        whatsapp: newReservation.whatsapp.trim(),
+        service: selectedServiceForNew?.name || "Servicio",
+        serviceId: newReservation.serviceId,
+        date: adminSelectedDate,
+        time: newReservation.time,
+        status: "pending",
+        reservationId,
+      };
+      setReservations((prev) => [...prev, created]);
+      setShowCreateReservation(false);
+      return;
+    }
+
+    setAdminCreateLoading(true);
+    setAdminCreateError("");
+    try {
+      const response = await fetch(reservationsEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newReservation.name.trim(),
+          whatsapp: newReservation.whatsapp.trim(),
+          service: selectedServiceForNew?.name || "Servicio",
+          serviceId: newReservation.serviceId,
+          date: adminSelectedDate,
+          time: newReservation.time,
+          status: "pending",
+          reservationId,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("Request failed");
+      }
+      const created = await response.json();
+      setReservations((prev) => [...prev, created]);
+      setShowCreateReservation(false);
+    } catch (error) {
+      setAdminCreateError("No se pudo guardar la reserva.");
+    } finally {
+      setAdminCreateLoading(false);
+    }
   };
 
   const startEditService = (serviceItem) => {
@@ -650,21 +785,50 @@ function App() {
     setRescheduleTime(reservation.time);
   };
 
-  const applyReschedule = () => {
+  const applyReschedule = async () => {
     if (!rescheduleId || !rescheduleTime) return;
-    setReservations((prev) =>
-      prev.map((reservation) =>
-        reservation.id === rescheduleId
-          ? {
-              ...reservation,
-              time: rescheduleTime,
-              date: adminSelectedDate,
-            }
-          : reservation
-      )
-    );
-    setRescheduleId(null);
-    setRescheduleTime("");
+    if (useLocalStorage) {
+      setReservations((prev) =>
+        prev.map((reservation) =>
+          reservation.id === rescheduleId
+            ? {
+                ...reservation,
+                time: rescheduleTime,
+                date: adminSelectedDate,
+              }
+            : reservation
+        )
+      );
+      setRescheduleId(null);
+      setRescheduleTime("");
+      return;
+    }
+
+    setAdminUpdateError("");
+    try {
+      const response = await fetch(reservationsEndpoint, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: rescheduleId,
+          time: rescheduleTime,
+          date: adminSelectedDate,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("Request failed");
+      }
+      const updated = await response.json();
+      setReservations((prev) =>
+        prev.map((reservation) =>
+          reservation.id === rescheduleId ? updated : reservation
+        )
+      );
+      setRescheduleId(null);
+      setRescheduleTime("");
+    } catch (error) {
+      setAdminUpdateError("No se pudo reprogramar la reserva.");
+    }
   };
 
   if (route === "admin-login") {
@@ -844,6 +1008,16 @@ function App() {
               </button>
             </div>
           </header>
+
+          {reservationsLoading && (
+            <p className="helper-text">Cargando reservas...</p>
+          )}
+          {reservationsError && (
+            <p className="inline-error">{reservationsError}</p>
+          )}
+          {adminUpdateError && (
+            <p className="inline-error">{adminUpdateError}</p>
+          )}
 
           {adminPendingOpen && (
             <section className="pending-panel" aria-label="Reservas pendientes">
@@ -1406,6 +1580,9 @@ function App() {
               <p className="helper-text">
                 Fecha seleccionada: {formatDate(adminSelectedDate)}
               </p>
+              {adminCreateError && (
+                <p className="inline-error">{adminCreateError}</p>
+              )}
               <div className="admin-create-grid">
                 <label className="form-field">
                   <span className="field-label">Nombre</span>
@@ -1488,13 +1665,14 @@ function App() {
                 type="button"
                 onClick={handleCreateReservation}
                 disabled={
+                  adminCreateLoading ||
                   !newReservation.name.trim() ||
                   !newReservation.whatsapp.trim() ||
                   !newReservation.serviceId ||
                   !newReservation.time
                 }
               >
-                Guardar reserva
+                {adminCreateLoading ? "Guardando..." : "Guardar reserva"}
               </button>
             </section>
           )}
@@ -2124,9 +2302,11 @@ function App() {
           className="primary-button"
           type="button"
           onClick={handleStartReservation}
+          disabled={isSubmittingReservation}
         >
-          Iniciar reserva
+          {isSubmittingReservation ? "Guardando..." : "Iniciar reserva"}
         </button>
+        {submitError && <p className="inline-error">{submitError}</p>}
       </section>
     </main>
   );

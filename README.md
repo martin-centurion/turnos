@@ -1,16 +1,57 @@
-# React + Vite
+# Turnos - Reservas
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Backend (Supabase + Resend)
 
-Currently, two official plugins are available:
+La app usa una Function de Vercel en `api/reservations.js` para guardar reservas y enviar un email al admin.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 1) Crear tabla en Supabase
 
-## React Compiler
+En el SQL Editor de Supabase:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```sql
+create table if not exists reservations (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamp with time zone default now(),
+  name text not null,
+  whatsapp text not null,
+  service text not null,
+  service_id text,
+  date date not null,
+  time text not null,
+  status text not null default 'pending',
+  reservation_id text not null
+);
 
-## Expanding the ESLint configuration
+create index if not exists reservations_date_idx on reservations (date);
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 2) Variables de entorno
+
+Copiá `.env.example` a `.env` en local y configurá las mismas variables en Vercel.
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `RESEND_API_KEY`
+- `RESEND_FROM`
+- `ADMIN_EMAIL`
+
+Notas:
+- `SUPABASE_SERVICE_ROLE_KEY` es privada (no la expongas en el frontend).
+- `RESEND_FROM` debe ser un dominio verificado en Resend (ej: `Reservas <no-reply@tudominio.com>`).
+- `ADMIN_EMAIL` es el mail que recibe la notificación.
+
+### 3) Desarrollo local
+
+Opciones:
+
+1) Usar Vercel Functions en local:
+   - `vercel dev`
+
+2) Usar modo local sin backend:
+   - `VITE_USE_LOCAL_STORAGE=true` y luego `npm run dev`
+
+## Endpoints
+
+- `GET /api/reservations` lista todas las reservas.
+- `POST /api/reservations` crea una reserva y envía mail al admin.
+- `PATCH /api/reservations` actualiza estado/fecha/horario.
