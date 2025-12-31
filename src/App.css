@@ -747,7 +747,12 @@
 
 .login-header {
   display: grid;
-  gap: 6px;
+  gap: 18px;
+}
+
+.admin-logo {
+  justify-self: center;
+  margin-bottom: 6px;
 }
 
 .login-form {

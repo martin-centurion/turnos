@@ -399,6 +399,9 @@ function App() {
       <main className="admin-screen">
         <section className="admin-panel login-panel" aria-label="Acceso admin">
           <header className="login-header">
+            <div className="logo-badge admin-logo">
+              <span>Logo</span>
+            </div>
             <p className="flow-title">Acceso administrador</p>
             <p className="flow-subtitle">
               Ingresá con tu usuario y contraseña.
