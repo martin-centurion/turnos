@@ -2,13 +2,15 @@
 
 ## Backend (Supabase + Resend)
 
-La app usa una Function de Vercel en `api/reservations.js` para guardar reservas y enviar un email al admin.
+La app usa Functions de Vercel en `api/reservations.js` y `api/services.js` para guardar reservas y servicios, y enviar un email al admin.
 
-### 1) Crear tabla en Supabase
+### 1) Crear tablas en Supabase
 
 En el SQL Editor de Supabase:
 
 ```sql
+create extension if not exists pgcrypto;
+
 create table if not exists reservations (
   id uuid primary key default gen_random_uuid(),
   created_at timestamp with time zone default now(),
@@ -23,6 +25,15 @@ create table if not exists reservations (
 );
 
 create index if not exists reservations_date_idx on reservations (date);
+
+create table if not exists services (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamp with time zone default now(),
+  name text not null,
+  duration text not null,
+  price numeric not null,
+  available_times jsonb not null default '[]'::jsonb
+);
 ```
 
 ### 2) Variables de entorno
@@ -50,8 +61,14 @@ Opciones:
 2) Usar modo local sin backend:
    - `VITE_USE_LOCAL_STORAGE=true` y luego `npm run dev`
 
+Nota: cuando `VITE_USE_LOCAL_STORAGE=false`, los servicios se leen desde Supabase. Si la tabla `services` está vacía, cargalos desde el panel admin en "Administrar servicios".
+
 ## Endpoints
 
 - `GET /api/reservations` lista todas las reservas.
 - `POST /api/reservations` crea una reserva y envía mail al admin.
 - `PATCH /api/reservations` actualiza estado/fecha/horario.
+- `GET /api/services` lista servicios.
+- `POST /api/services` crea un servicio.
+- `PATCH /api/services` actualiza un servicio.
+- `DELETE /api/services` elimina un servicio.

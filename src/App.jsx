@@ -3,6 +3,7 @@ import "./App.css";
 
 const useLocalStorage = import.meta.env.VITE_USE_LOCAL_STORAGE === "true";
 const reservationsEndpoint = "/api/reservations";
+const servicesEndpoint = "/api/services";
 
 const contactLinks = [
   { label: "Sitio Web", href: "#" },
@@ -203,7 +204,7 @@ const normalizePhone = (value) => value.replace(/[^\d]/g, "");
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "admin123";
 
-const loadServices = () => {
+const loadLocalServices = () => {
   if (typeof window === "undefined") return initialServices;
   const stored = window.localStorage.getItem("turnos_services");
   if (!stored) return initialServices;
@@ -252,7 +253,13 @@ function App() {
   const [adminSelectedDate, setAdminSelectedDate] = useState(() =>
     toIsoDate(new Date())
   );
-  const [services, setServices] = useState(() => loadServices());
+  const [services, setServices] = useState(() =>
+    useLocalStorage ? loadLocalServices() : []
+  );
+  const [servicesLoading, setServicesLoading] = useState(!useLocalStorage);
+  const [servicesError, setServicesError] = useState("");
+  const [serviceActionError, setServiceActionError] = useState("");
+  const [serviceActionLoading, setServiceActionLoading] = useState(false);
   const [reservations, setReservations] = useState(() =>
     useLocalStorage ? loadLocalReservations() : []
   );
@@ -360,6 +367,20 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!useLocalStorage || typeof window === "undefined") return;
+    const handleStorage = (event) => {
+      if (event.key === "turnos_services") {
+        setServices(loadLocalServices());
+      }
+      if (event.key === "turnos_reservations") {
+        setReservations(loadLocalReservations());
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  useEffect(() => {
     if (route === "admin" && !adminAuthed) {
       navigate("admin-login", "/login");
     }
@@ -379,6 +400,28 @@ function App() {
       );
     }
   }, [adminMonth]);
+
+  const fetchServices = useCallback(async () => {
+    if (useLocalStorage) {
+      setServices(loadLocalServices());
+      setServicesLoading(false);
+      return;
+    }
+    setServicesLoading(true);
+    setServicesError("");
+    try {
+      const response = await fetch(servicesEndpoint);
+      if (!response.ok) {
+        throw new Error("Request failed");
+      }
+      const data = await response.json();
+      setServices(data);
+    } catch (error) {
+      setServicesError("No se pudieron cargar los servicios.");
+    } finally {
+      setServicesLoading(false);
+    }
+  }, []);
 
   const fetchReservations = useCallback(async () => {
     if (useLocalStorage) {
@@ -403,6 +446,10 @@ function App() {
   }, []);
 
   useEffect(() => {
+    fetchServices();
+  }, [fetchServices]);
+
+  useEffect(() => {
     fetchReservations();
   }, [fetchReservations]);
 
@@ -415,7 +462,7 @@ function App() {
   }, [reservations]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!useLocalStorage || typeof window === "undefined") return;
     window.localStorage.setItem("turnos_services", JSON.stringify(services));
   }, [services]);
 
@@ -584,6 +631,7 @@ function App() {
     setAdminServicesOpen(false);
     setAdminCreateError("");
     setAdminUpdateError("");
+    setServiceActionError("");
     setAdminStatsMonth(
       new Date(adminMonth.getFullYear(), adminMonth.getMonth(), 1)
     );
@@ -602,6 +650,7 @@ function App() {
     setAdminStatsOpen(false);
     setAdminCreateError("");
     setAdminUpdateError("");
+    setServiceActionError("");
   };
 
   const openServices = () => {
@@ -612,6 +661,7 @@ function App() {
     setAdminStatsOpen(false);
     setAdminCreateError("");
     setAdminUpdateError("");
+    setServiceActionError("");
     setServiceForm({
       id: "",
       name: "",
@@ -687,6 +737,7 @@ function App() {
   };
 
   const startEditService = (serviceItem) => {
+    setServiceActionError("");
     setServiceForm({
       id: serviceItem.id,
       name: serviceItem.name,
@@ -702,17 +753,50 @@ function App() {
     setAdminMenuOpen(false);
   };
 
-  const deleteService = (serviceId) => {
-    setServices((prev) => prev.filter((serviceItem) => serviceItem.id !== serviceId));
-    setReservations((prev) =>
-      prev.map((reservation) =>
-        reservation.serviceId === serviceId
-          ? { ...reservation, serviceId: "", service: reservation.service }
-          : reservation
-      )
-    );
-    if (selectedService === serviceId) {
-      setSelectedService(null);
+  const deleteService = async (serviceId) => {
+    setServiceActionError("");
+    if (useLocalStorage) {
+      setServices((prev) =>
+        prev.filter((serviceItem) => serviceItem.id !== serviceId)
+      );
+      setReservations((prev) =>
+        prev.map((reservation) =>
+          reservation.serviceId === serviceId
+            ? { ...reservation, serviceId: "", service: reservation.service }
+            : reservation
+        )
+      );
+      if (selectedService === serviceId) {
+        setSelectedService(null);
+      }
+      return;
+    }
+
+    setServiceActionLoading(true);
+    try {
+      const response = await fetch(`${servicesEndpoint}?id=${serviceId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error("Request failed");
+      }
+      setServices((prev) =>
+        prev.filter((serviceItem) => serviceItem.id !== serviceId)
+      );
+      setReservations((prev) =>
+        prev.map((reservation) =>
+          reservation.serviceId === serviceId
+            ? { ...reservation, serviceId: "" }
+            : reservation
+        )
+      );
+      if (selectedService === serviceId) {
+        setSelectedService(null);
+      }
+    } catch (error) {
+      setServiceActionError("No se pudo eliminar el servicio.");
+    } finally {
+      setServiceActionLoading(false);
     }
   };
 
@@ -726,7 +810,8 @@ function App() {
     });
   };
 
-  const handleSaveService = () => {
+  const handleSaveService = async () => {
+    setServiceActionError("");
     const name = serviceForm.name.trim();
     const duration = serviceForm.duration.trim();
     const price = Number(serviceForm.price);
@@ -736,38 +821,102 @@ function App() {
       : defaultAvailableTimes;
 
     if (isEditingService) {
-      setServices((prev) =>
-        prev.map((serviceItem) =>
-          serviceItem.id === serviceForm.id
-            ? {
-                ...serviceItem,
-                name,
-                duration,
-                price,
-                availableTimes,
-              }
-            : serviceItem
-        )
-      );
-      setReservations((prev) =>
-        prev.map((reservation) =>
-          reservation.serviceId === serviceForm.id
-            ? { ...reservation, service: name }
-            : reservation
-        )
-      );
+      if (useLocalStorage) {
+        setServices((prev) =>
+          prev.map((serviceItem) =>
+            serviceItem.id === serviceForm.id
+              ? {
+                  ...serviceItem,
+                  name,
+                  duration,
+                  price,
+                  availableTimes,
+                }
+              : serviceItem
+          )
+        );
+        setReservations((prev) =>
+          prev.map((reservation) =>
+            reservation.serviceId === serviceForm.id
+              ? { ...reservation, service: name }
+              : reservation
+          )
+        );
+      } else {
+        setServiceActionLoading(true);
+        try {
+          const response = await fetch(servicesEndpoint, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: serviceForm.id,
+              name,
+              duration,
+              price,
+              availableTimes,
+            }),
+          });
+          if (!response.ok) {
+            throw new Error("Request failed");
+          }
+          const updated = await response.json();
+          setServices((prev) =>
+            prev.map((serviceItem) =>
+              serviceItem.id === updated.id ? updated : serviceItem
+            )
+          );
+          setReservations((prev) =>
+            prev.map((reservation) =>
+              reservation.serviceId === updated.id
+                ? { ...reservation, service: updated.name }
+                : reservation
+            )
+          );
+        } catch (error) {
+          setServiceActionError("No se pudo actualizar el servicio.");
+          return;
+        } finally {
+          setServiceActionLoading(false);
+        }
+      }
     } else {
-      const newService = {
-        id:
-          typeof crypto !== "undefined" && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `srv-${Date.now()}`,
-        name,
-        duration,
-        price,
-        availableTimes,
-      };
-      setServices((prev) => [...prev, newService]);
+      if (useLocalStorage) {
+        const newService = {
+          id:
+            typeof crypto !== "undefined" && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `srv-${Date.now()}`,
+          name,
+          duration,
+          price,
+          availableTimes,
+        };
+        setServices((prev) => [...prev, newService]);
+      } else {
+        setServiceActionLoading(true);
+        try {
+          const response = await fetch(servicesEndpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name,
+              duration,
+              price,
+              availableTimes,
+            }),
+          });
+          if (!response.ok) {
+            throw new Error("Request failed");
+          }
+          const created = await response.json();
+          setServices((prev) => [...prev, created]);
+        } catch (error) {
+          setServiceActionError("No se pudo crear el servicio.");
+          return;
+        } finally {
+          setServiceActionLoading(false);
+        }
+      }
     }
 
     setServiceForm({
@@ -1185,8 +1334,18 @@ function App() {
                 </button>
               </div>
 
+              {servicesLoading && (
+                <p className="helper-text">Cargando servicios...</p>
+              )}
+              {servicesError && (
+                <p className="inline-error">{servicesError}</p>
+              )}
+              {serviceActionError && (
+                <p className="inline-error">{serviceActionError}</p>
+              )}
+
               <div className="services-list">
-                {services.length === 0 ? (
+                {services.length === 0 && !servicesLoading ? (
                   <p className="empty-state">
                     No hay servicios cargados.
                   </p>
@@ -1209,6 +1368,7 @@ function App() {
                           className="secondary-button"
                           type="button"
                           onClick={() => startEditService(serviceItem)}
+                          disabled={serviceActionLoading}
                         >
                           Editar
                         </button>
@@ -1216,6 +1376,7 @@ function App() {
                           className="secondary-button outline"
                           type="button"
                           onClick={() => deleteService(serviceItem.id)}
+                          disabled={serviceActionLoading}
                         >
                           Eliminar
                         </button>
@@ -1302,12 +1463,17 @@ function App() {
                     type="button"
                     onClick={handleSaveService}
                     disabled={
+                      serviceActionLoading ||
                       !serviceForm.name.trim() ||
                       !serviceForm.duration.trim() ||
                       Number.isNaN(Number(serviceForm.price))
                     }
                   >
-                    {isEditingService ? "Guardar cambios" : "Agregar servicio"}
+                    {serviceActionLoading
+                      ? "Guardando..."
+                      : isEditingService
+                      ? "Guardar cambios"
+                      : "Agregar servicio"}
                   </button>
                   {isEditingService && (
                     <button
@@ -1825,31 +1991,39 @@ function App() {
             </div>
           </header>
 
-          <div className="service-list">
-            {services.map((item) => {
-              const isSelected = item.id === selectedService;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`service-card${isSelected ? " selected" : ""}`}
-                  onClick={() => {
-                    setSelectedService(item.id);
-                    setSelectedDate("");
-                    setSelectedTime("");
-                  }}
-                >
-                  <div>
-                    <p className="service-name">{item.name}</p>
-                    <p className="service-meta">{item.duration}</p>
-                  </div>
-                  <span className="service-price">
-                    {formatMoney(item.price)}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          {servicesLoading && (
+            <p className="helper-text">Cargando servicios...</p>
+          )}
+          {servicesError && <p className="inline-error">{servicesError}</p>}
+          {!servicesLoading && services.length === 0 ? (
+            <p className="empty-state">No hay servicios disponibles.</p>
+          ) : (
+            <div className="service-list">
+              {services.map((item) => {
+                const isSelected = item.id === selectedService;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`service-card${isSelected ? " selected" : ""}`}
+                    onClick={() => {
+                      setSelectedService(item.id);
+                      setSelectedDate("");
+                      setSelectedTime("");
+                    }}
+                  >
+                    <div>
+                      <p className="service-name">{item.name}</p>
+                      <p className="service-meta">{item.duration}</p>
+                    </div>
+                    <span className="service-price">
+                      {formatMoney(item.price)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           <button
             className="primary-button"
