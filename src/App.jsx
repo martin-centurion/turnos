@@ -12,6 +12,56 @@ const contactLinks = [
   { label: "WhatsApp", href: "#" },
 ];
 
+const InstagramIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="4"
+      y="4"
+      width="16"
+      height="16"
+      rx="5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    />
+    <circle
+      cx="12"
+      cy="12"
+      r="3.2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    />
+    <circle cx="17" cy="7" r="1.2" fill="currentColor" />
+  </svg>
+);
+
+const FacebookIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M14.3 8.7h2V6h-2c-2.3 0-3.6 1.3-3.6 3.7V12H8.5v2.7h2.2V21h3.1v-6.3h2.5l.4-2.7h-2.9V9.9c0-.7.2-1.2 1.3-1.2z"
+      fill="currentColor"
+    />
+  </svg>
+);
+
+const WhatsappIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M6.7 4.8c.4-.4.9-.5 1.4-.3l2.2 1.2c.5.2.7.8.5 1.3l-.8 1.7c-.1.3-.1.6.1.8 1 1.4 2.2 2.6 3.6 3.6.2.2.5.2.8.1l1.7-.8c.5-.2 1.1 0 1.3.5l1.2 2.2c.2.5.1 1-.3 1.4l-1.4 1.4c-.7.7-1.6 1-2.5.7-2.4-.6-4.7-2-6.8-4.1C5.3 12.9 3.9 10.6 3.3 8.2c-.2-.9 0-1.8.7-2.5l1.4-1.4z"
+      fill="currentColor"
+    />
+  </svg>
+);
+
+const socialIconByLabel = {
+  Instagram: InstagramIcon,
+  Facebook: FacebookIcon,
+  WhatsApp: WhatsappIcon,
+};
+
+const socialLinks = contactLinks.filter((link) => link.label !== "Sitio Web");
+
 const buildTimeSlots = () => {
   const slots = [];
   for (let hour = 10; hour <= 20; hour += 1) {
@@ -558,6 +608,28 @@ function App() {
     setReservationId("");
     setSubmitError("");
     setScreen("services");
+  };
+
+  const handleShareApp = async () => {
+    if (typeof navigator === "undefined") return;
+    const sharePayload = {
+      title: "Turnos",
+      text: "Reserva tu turno",
+      url: window.location.href,
+    };
+    if (navigator.share) {
+      try {
+        await navigator.share(sharePayload);
+      } catch (_error) {
+      }
+      return;
+    }
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+      } catch (_error) {
+      }
+    }
   };
 
   const handleCopyAlias = async () => {
@@ -2035,8 +2107,57 @@ function App() {
     return (
       <main className="landing-screen">
         <section className="landing-panel" aria-label="Inicio">
-          <div className="logo-badge">
-            <span>Logo</span>
+          <header className="landing-header">
+            <button
+              className="share-button"
+              type="button"
+              onClick={handleShareApp}
+            >
+              Compartir App
+            </button>
+            <button
+              className="share-icon"
+              type="button"
+              aria-label="Compartir app"
+              onClick={handleShareApp}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="18" cy="5" r="2" fill="currentColor" />
+                <circle cx="6" cy="12" r="2" fill="currentColor" />
+                <circle cx="18" cy="19" r="2" fill="currentColor" />
+                <path
+                  d="M8 12l8-6M8 12l8 6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </header>
+          <div className="landing-profile">
+            <div className="logo-badge landing-logo">
+              <span>Logo</span>
+            </div>
+            <div className="landing-title">
+              <p className="company-name">Nombre Empresa</p>
+              <p className="landing-subtitle">Nombre de servicios prestados</p>
+            </div>
+            <div className="landing-socials">
+              {socialLinks.map((link) => {
+                const Icon = socialIconByLabel[link.label];
+                return (
+                  <a
+                    key={link.label}
+                    className="social-pill"
+                    href={link.href}
+                    aria-label={link.label}
+                  >
+                    {Icon ? <Icon /> : null}
+                  </a>
+                );
+              })}
+            </div>
           </div>
           <div className="landing-actions">
             <button

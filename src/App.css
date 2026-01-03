@@ -2,17 +2,78 @@
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 40px 20px 56px;
-  background: #ffffff;
+  padding: 36px 20px 48px;
+  background: radial-gradient(
+      120% 80% at 50% -10%,
+      rgba(79, 176, 174, 0.2) 0%,
+      rgba(79, 176, 174, 0) 55%
+    ),
+    var(--bg);
   color: var(--text-main);
 }
 
 .landing-panel {
-  width: min(320px, 90vw);
+  width: min(340px, 92vw);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 26px;
+  gap: 22px;
+}
+
+.landing-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.share-button {
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-strong);
+  background: #ffffff;
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.share-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.share-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: var(--text-main);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(79, 176, 174, 0.25);
+}
+
+.share-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.share-icon:focus-visible,
+.social-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.landing-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
 
 .logo-badge {
@@ -23,7 +84,7 @@
   place-items: center;
   gap: 4px;
   text-align: center;
-  background: #0e0e0e;
+  background: var(--text-main);
   color: #fcfcfc;
   font-weight: 600;
   font-size: 14px;
@@ -36,11 +97,57 @@
   line-height: 1.1;
 }
 
+.logo-badge.landing-logo {
+  width: 124px;
+  height: 124px;
+  font-size: 13px;
+}
+
+.landing-title {
+  display: grid;
+  gap: 4px;
+  text-align: center;
+}
+
+.landing-title .company-name {
+  font-size: 16px;
+}
+
+.landing-subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.landing-socials {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.social-pill {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--text-main);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+  box-shadow: 0 6px 14px rgba(79, 176, 174, 0.22);
+}
+
+.social-pill svg {
+  width: 18px;
+  height: 18px;
+}
+
 .landing-actions {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .landing-pill {
@@ -48,13 +155,23 @@
   padding: 14px 18px;
   border-radius: 999px;
   border: none;
-  background: var(--accent);
+  background: var(--text-main);
   color: #ffffff;
   font-size: 15px;
+  font-weight: 600;
   letter-spacing: 0.02em;
   text-align: center;
   text-decoration: none;
   cursor: pointer;
+  box-shadow: 0 10px 20px rgba(79, 176, 174, 0.25);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+@media (hover: hover) {
+  .landing-pill:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 22px rgba(79, 176, 174, 0.32);
+  }
 }
 
 .landing-pill:focus-visible {
