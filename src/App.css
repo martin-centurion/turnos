@@ -61,6 +61,7 @@
 .share-icon svg {
   width: 16px;
   height: 16px;
+  fill: currentColor;
 }
 
 .share-icon:focus-visible,
@@ -150,6 +151,12 @@
   gap: 12px;
 }
 
+.landing-footer {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
 .landing-pill {
   width: 100%;
   padding: 14px 18px;
@@ -160,11 +167,28 @@
   font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   text-align: center;
   text-decoration: none;
   cursor: pointer;
   box-shadow: 0 10px 20px rgba(79, 176, 174, 0.25);
   transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.landing-pill .pill-icon {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+}
+
+.landing-pill svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
 }
 
 @media (hover: hover) {
